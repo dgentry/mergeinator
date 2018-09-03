@@ -64,6 +64,7 @@ clean: ## Removes old tpg.logs (those with date-times) and emacs auto-save files
 cleaner: ## Clean, plus removes .mats, tpg.log, and .pyc's everywhere (even those
 cleaner: ## lurking in any virtual environment you might have).
 cleaner: clean
+	rm -rf .pytest_cache
 	find . -name \*.pyc | xargs rm -f
 
 .PHONY: distclean

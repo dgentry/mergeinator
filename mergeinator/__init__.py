@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import argparse
 import datetime
 import sys
+import stat
 import subprocess
 import os
 import re
@@ -146,9 +146,26 @@ def identical(f1, f2):
     return match
 
 
-def dmark(filename):
-    if os.path.isdir(filename):
+def dmark(path):
+    """Return a mark that indicates file type, or "" for ordinary files.
+
+    Returns a slash (`/') if the path is a directory, an asterisk (`*') for executables, an
+    at sign (`@') for symbolic links, an equals sign (`=') for sockets, a
+    percent sign (`%') whiteouts, or a vertical bar (`|') for a FIFO.
+    """
+
+    if os.path.isdir(path):
         return "/"
+    elif os.path.isfile(path) and os.access(path, os.X_OK):
+        return "*"
+    elif os.path.islink(path):
+        return"@"
+    elif stat.S.ISSOCK(os.stat(path).st_mode):
+        return "="
+    elif stat.S_ISWHT(os.stat(path).st_mode):
+        return "%"
+    elif stat.S_ISFIFO(os.stat(path).st_mode):
+        return "|"
     else:
         return ""
 
@@ -298,19 +315,3 @@ def walk(root_dir, dest_root, level):
                         finderopen(dest_file)
                     elif action == "s":
                         print("Skipping.")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Merginator')
-    parser.add_argument('source', help="Merge source")
-    parser.add_argument("destination", help="Merge destination")
-    # parser.add_argument("-n", "--no-op", help="Don't change anything", required=False)
-    parser.add_argument("-y", "--yes", help="force answer of yes to questions.",
-                        action="store_true", required=False)
-    args = parser.parse_args()
-
-    # show values
-    force_yes = args.yes
-    print(f"Source dir: {WHT}{args.source}{NORMAL}  ({os.path.abspath(args.source)})")
-    print(f"Destination: {WHT}{args.destination}{NORMAL} ({os.path.abspath(args.destination)})\n")
-    walk(args.source, args.destination, 0)

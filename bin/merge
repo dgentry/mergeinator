@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import mergeinator
+from mergeinator import WHT,NORMAL
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Merginator')
+    parser.add_argument('source', help="Merge source")
+    parser.add_argument("destination", help="Merge destination")
+    # parser.add_argument("-n", "--no-op", help="Don't change anything", required=False)
+    parser.add_argument("-y", "--yes", help="force answer of yes to questions.",
+                        action="store_true", required=False)
+    args = parser.parse_args()
+
+    # show values
+    mergeinator.force_yes = args.yes
+    print(f"Source dir: {WHT}{args.source}{NORMAL}  ({os.path.abspath(args.source)})")
+    print(f"Destination: {WHT}{args.destination}{NORMAL} ({os.path.abspath(args.destination)})\n")
+    mergeinator.walk(args.source, args.destination, 0)

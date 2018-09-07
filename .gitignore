@@ -1,0 +1,51 @@
+# Compiled python modules.
+*.pyc
+
+# Setuptools distribution folder.
+/dist/
+
+# Python egg metadata, regenerated from source files by setuptools.
+/*.egg-info
+
+# Mac Filesystem
+**.DS_STORE
+
+# IDE/Editor Stuff
+
+# Editor (emacs, vi) temp and autosave files
+*~
+#*#
+**/.#*
+**/#*#
+
+# Ignore TAGS file as used by some editors (emacs)
+TAGS
+**/*_flymake.py
+
+# For rope (refactoring library)
+.ropeproject/globalnames
+.ropeproject/history
+.ropeproject/objectdb
+
+# Ignore Eclipse project files (for now)
+**/.project
+**/.buildpath
+**/.cproject
+**/.pydevproject
+**/.settings/
+**/.externalToolBuilders
+**/.metadata
+
+# Sublime stuff
+*.sublime-project
+*.sublime-workspace
+
+# Continuous Integration Stuff
+
+# nose coverage keeps its data here
+.coverage
+.noseids
+
+# Python profiling
+main.profile
+pylint.out.txt

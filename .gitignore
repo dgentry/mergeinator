@@ -49,3 +49,4 @@ TAGS
 # Python profiling
 main.profile
 pylint.out.txt
+.pytest_cache/

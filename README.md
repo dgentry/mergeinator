@@ -44,3 +44,7 @@ make install
 ```
 
 If there is interest, I'll put it on pypi.
+
+## Developer Notes
+Packaged according to this scheme, which seems extremely sensible:
+https://blog.ionelmc.ro/2014/05/25/python-packaging

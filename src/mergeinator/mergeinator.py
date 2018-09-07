@@ -152,7 +152,9 @@ def _dmark(path):
     percent sign (`%') whiteouts, or a vertical bar (`|') for a FIFO.
     """
 
-    if os.path.isdir(path):
+    if not os.path.exists(path):
+        return ""
+    elif os.path.isdir(path):
         return "/"
     elif os.path.isfile(path) and os.access(path, os.X_OK):
         return "*"
@@ -217,7 +219,7 @@ def is_empty(path):
     return False
 
 
-def merge(root_dir, dest_root, level, dry_run_flag, yes_flag):
+def do_merge(root_dir, dest_root, level, dry_run_flag, yes_flag):
     """Set global flags and call initial walk()."""
 
     global force_yes

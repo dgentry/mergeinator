@@ -114,11 +114,11 @@ GB = 1024 * MB
 def nice_size(bytes):
     """Report bytes in appropriate units for size: T, G, M, K."""
     if bytes > GB:
-        return f"{int(bytes/GB/10)*10}GB"
+        return f"{int(bytes*GB/10)/10} GB"
     if bytes > MB:
-        return f"{int(bytes/MB/10)*10}MB"
+        return f"{int(bytes*MB/10)/10} MB"
     if bytes > KB:
-        return f"{int(bytes/KB/10)*10}KB"
+        return f"{int(bytes*10/KB)/10} KB"
     return f"{bytes}B"
 
 
@@ -303,12 +303,13 @@ def walk(root_dir, dest_root, level):
             # If this is a flatfile or monolithic directory, offer to delete older
             if os.path.isfile(abs_f) or dirtype:
                 if abs_f_mtime > dest_f_mtime:
-                    older_file = dest_f_mtime
+                    older_file = dest_file
                 else:
-                    older_file = abs_f_mtime
+                    older_file = abs_f
                 del_ok = "f"
                 while del_ok == 'f':
-                    del_ok = answer(f"Delete older file ({older_file}) or show diFf [D/n/f]?")
+                    del_ok = answer(f"Delete older file ({older_file + _dmark(older_file)}) "
+                                    "or show diFf [D/n/f]?")
                     if del_ok == 'f':
                         rv = subprocess.run(["diff", "-r", abs_f, dest_file], capture_output=True)
                         print(rv.stdout)

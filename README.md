@@ -1,7 +1,6 @@
 ## What it does
-
-The mergeinator merges a directory (the "source directory) into a similar directory (the
-"destination" which doesn't have to be a parent of the source directory), eliminating
+The mergeinator merges a directory (the "source directory") into a similar directory (the
+"destination" which can be a parent of the source directory), eliminating
 duplicates as it goes.  After several runs, the source directory should be gone, merged into
 the destination.
 
@@ -11,9 +10,11 @@ $ merge old_home_dir_copy ~/
 ```
 
 ## Why would you want this?
-
 Every time I make a tarball of my directory tree, I later end up expanding it somewhere
-within my (future) directory tree, so I end up with a mostly older copy of my main tree.
+within my directory tree, so I end up with a mostly older copy of my main tree embedded in
+my real tree.  Cleaning it up is a pain because if you just delete the whole thing, you
+might lose some stuff you want.  Merging stuff you might want manually first is error-prone
+and takes forever.
 
 ## Better than alternatives
 It's better for this purpose than the commercial de-dup utilities I've found because it
@@ -41,3 +42,5 @@ Maybe someday I'll put a Mac UI on it.
 ```
 make install
 ```
+
+If there is interest, I'll put it on pypi.

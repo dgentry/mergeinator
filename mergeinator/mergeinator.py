@@ -144,7 +144,7 @@ def identical(f1, f2):
     return match
 
 
-def dmark(path):
+def _dmark(path):
     """Return a mark that indicates file type, or "" for ordinary files.
 
     Returns a slash (`/') if the path is a directory, an asterisk (`*') for executables, an
@@ -158,7 +158,7 @@ def dmark(path):
         return "*"
     elif os.path.islink(path):
         return"@"
-    elif stat.S.ISSOCK(os.stat(path).st_mode):
+    elif stat.S_ISSOCK(os.stat(path).st_mode):
         return "="
     elif stat.S_ISWHT(os.stat(path).st_mode):
         return "%"
@@ -168,8 +168,15 @@ def dmark(path):
         return ""
 
 
-def printfiles(level, f1, op, f2, mod):
-    print(" " * level * 4 + f"{f1}{dmark(f1)} ?--> {mod}{f2}{dmark(f2)}{NORMAL}", end="")
+def printfiles(level, f1, f2, mod):
+    """Indent according to level, then print source and destination file nicely.
+
+    Args:
+        level: depth from root in source tree.
+        f1, f2:  filenames to print.
+        mod:  color/bold/dim modifier
+    """
+    print(" " * level * 4 + f"{f1}{_dmark(f1)} ?--> {mod}{f2}{_dmark(f2)}{NORMAL}", end="")
 
 
 def remove(path):
@@ -226,13 +233,13 @@ def walk(root_dir, dest_root, level):
         abs_f = os.path.normpath(os.path.join(root_dir, fname))
         dest_file = os.path.normpath(os.path.join(dest_root, fname))
         if not os.path.exists(dest_file):
-            printfiles(level, abs_f, "-->", dest_file, DIM)
+            printfiles(level, abs_f, dest_file, DIM)
             safe_move = answer("  Safe.  Move? [Y/n]")
             if safe_move in ["", "y"]:
                 move(abs_f, dest_file)
                 continue
         elif identical(abs_f, dest_file):
-            printfiles(level, abs_f, "-->", dest_file, "")
+            printfiles(level, abs_f, dest_file, "")
             print("  Identical.", end="")
             merge = answer("  Delete? [Y/n]")
             if merge in ["", "y"]:
@@ -241,7 +248,7 @@ def walk(root_dir, dest_root, level):
             else:
                 print("")
         else:
-            printfiles(level, abs_f, "-->", dest_file, RED)
+            printfiles(level, abs_f, dest_file, RED)
             print("  Differs.")
 
             # Check for source empty or symlink

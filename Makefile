@@ -68,8 +68,8 @@ tags: ## Refresh tags file for whole project.
 profile: ## Runs the app and produces profiling data
 
 .PHONY: test
-test:
-	py.test
+test:	## Invoke pytest to run tests
+	py.test --pyargs mergeinator
 
 .PHONY: viewprofile
 viewprofile:

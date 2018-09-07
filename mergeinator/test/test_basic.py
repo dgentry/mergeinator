@@ -1,14 +1,14 @@
 import os
 
-from merginator import dmark
+from mergeinator import _dmark
 
 
 def test_dmark_identifies_dirs():
-    assert dmark(".") == "/"
+    assert _dmark(".") == "/"
 
 
 def test_dmark_identifies_plain_files():
     fn = "/tmp/fooby-bletch-xyzzy-666"
     open(fn, "w").close()
-    assert dmark(fn) == ""
+    assert _dmark(fn) == ""
     os.remove(fn)

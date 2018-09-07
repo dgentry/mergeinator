@@ -124,8 +124,12 @@ def nice_size(bytes):
 
 def answer(question):
     global force_yes
+    global dry_run
+    if dry_run:
+        print(question, BLD + GRN + "n" + NORMAL)
+        return "n"
     if force_yes:
-        print(question, RED + "y" + NORMAL)
+        print(question, BLD + RED + "y" + NORMAL)
         return "y"
     else:
         return str.lower(input(question))
@@ -223,7 +227,9 @@ def do_merge(root_dir, dest_root, level, dry_run_flag, yes_flag):
     """Set global flags and call initial walk()."""
 
     global force_yes
+    global dry_run
     force_yes = yes_flag
+    dry_run = dry_run_flag
     walk(root_dir, dest_root, level)
 
 
@@ -279,7 +285,8 @@ def walk(root_dir, dest_root, level):
                     op = "newer"
                 else:
                     op = "older"
-                print(f"{abs_f} is {amount}seconds {op} than {dest_file} ({readable_date}).")
+                print(f"{abs_f} is {amount}seconds {op} than {dest_file}{_dmark(dest_file)} "
+                      f"({readable_date}).")
 
             # Check for directories we shouldn't open
             dirtype = re.match(".*\.git$|.*\.xcodeproj$", abs_f)
@@ -291,27 +298,22 @@ def walk(root_dir, dest_root, level):
                 if asize == dsize:
                     print(f"Both are {nice_size(asize)}.")
                 else:
-                    print(f"{abs_f} is {asize}, {dest_file} is {dsize}.")
+                    print(f"{abs_f} is {nice_size(asize)}, {dest_file} is {nice_size(dsize)}.")
 
             # If this is a flatfile or monolithic directory, offer to delete older
             if os.path.isfile(abs_f) or dirtype:
                 if abs_f_mtime > dest_f_mtime:
-                    direction = "newer"
+                    older_file = dest_f_mtime
                 else:
-                    direction = "older"
+                    older_file = abs_f_mtime
                 del_ok = "f"
                 while del_ok == 'f':
-                    del_ok = answer(f"{abs_f} is {direction}.  "
-                                    f"Delete older or show diFf [D/n/f]?")
+                    del_ok = answer(f"Delete older file ({older_file}) or show diFf [D/n/f]?")
                     if del_ok == 'f':
                         rv = subprocess.run(["diff", "-r", abs_f, dest_file], capture_output=True)
                         print(rv.stdout)
                     if del_ok in ['', 'd', 'y']:
-                        if direction == "older":
-                            remove(abs_f)
-                            continue
-                        else:
-                            move(abs_f, dest_file)
+                            remove(older_file)
                             continue
                     if del_ok == 'n':
                         pass

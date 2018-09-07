@@ -43,8 +43,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'merge = mergeinator.merge:cli',
-            'cli = mergeinator.cli:main'
+            'merge = mergeinator.merge:cli'
         ]
     },
 )

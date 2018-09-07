@@ -30,8 +30,16 @@ help: ## Show this help.
 	@fgrep -h "##" Makefile | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##//'
 
 .PHONY: install
-install:  ## Install to your system, using a symlink so edits take immediate effect
-	pip install -e .
+install:  ## Install to your system or virtualenv.
+	pip install --no-deps .
+
+.PHONY: develop
+develop:  ## Install to your system or virtualenv, using a symlink so edits take immediate effect.
+	pip install --no-deps -e .
+
+.PHONY: uninstall
+uninstall:  ## Remove 'merge' from your system or virtualenv
+	pip uninstall -y mergeinator
 
 .PHONY: clean
 clean: ## Removes old tpg.logs (those with date-times) and emacs auto-save files (*~) everywhere.

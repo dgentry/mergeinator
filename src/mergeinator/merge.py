@@ -14,7 +14,9 @@ from mergeinator import WHT, NORMAL
 @click.option("-y", "--yes", help="force answer of yes to questions.", is_flag=True)
 def cli(source, destination, dryrun, yes):
     """Merge trims away the source directory by moving its unique content into the destination
-    directory.  Duplicate content is discarded.
+    directory.  Duplicate content is discarded.  It may take multiple runs of merge (one per
+    level of subdirectory depth) to completely remove all duplicate content because merge
+    won't remove non-empty directories.
     """
     echo(f"Merging {WHT}{source}{NORMAL} ({os.path.abspath(source)}) to "
          f"{WHT}{destination}{NORMAL} ({os.path.abspath(destination)})\n")

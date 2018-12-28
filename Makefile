@@ -31,24 +31,24 @@ help: ## Show this help.
 
 .PHONY: install
 install:  ## Install to your system or virtualenv.
-	pip install --no-deps .
+	python3 -m pip install .
 
 .PHONY: develop
 develop:  ## Install to your system or virtualenv, using a symlink so edits take immediate effect.
-	pip install --no-deps -e .
+	python3 -m pip install -e .
 
 .PHONY: uninstall
 uninstall:  ## Remove 'merge' from your system or virtualenv
-	pip uninstall -y mergeinator
+	python3 -m pip uninstall -y mergeinator
 
 .PHONY: clean
-clean: ## Removes old tpg.logs (those with date-times) and emacs auto-save files (*~) everywhere.
-	rm -f ErrorLog tpg.log.* *.whl TAGS test-requirements.txt
+clean: ## Removes ErrorLog, wheels, TAGS, and emacs auto-save files (*~) everywhere.
+	rm -f ErrorLog *.whl TAGS
 	rm -rf __pycache__ mergeinator.egg-info
 	find . -name \*~ | xargs rm -f
 
 .PHONY: cleaner
-cleaner: ## Clean, plus removes .mats, tpg.log, and .pyc's everywhere (even those
+cleaner: ## Clean, plus removes .pyc's everywhere (even those
 cleaner: ## lurking in any virtual environment you might have).
 cleaner: clean
 	rm -rf .pytest_cache

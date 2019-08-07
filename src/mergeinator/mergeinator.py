@@ -264,10 +264,11 @@ def walk(root_dir, dest_root, level):
                 remove(abs_f)
                 continue
             else:
-                print("")
+                print(f"Left {abs_f}.")
         else:
-            printfiles(level, abs_f, dest_file, YEL)
-            print("  Differs.")
+            # The files are different, but that could be because the
+            # source is empty or a symlink, in which case we don't
+            # need to print "Differs."
 
             # Check for source empty or symlink
             reason = ""
@@ -280,6 +281,9 @@ def walk(root_dir, dest_root, level):
                 if del_ok in ["", "y", "d"]:
                     remove(abs_f)
                     continue
+
+            printfiles(level, abs_f, dest_file, YEL)
+            print("  Differs.")
 
             # Check mod times
             abs_f_mtime = os.path.getmtime(abs_f)

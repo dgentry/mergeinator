@@ -174,6 +174,12 @@ def _dmark(path):
         return ""
 
 
+def _marked(path):
+    """Return path with a type indication appended."""
+
+    return path + _dmark(path)
+
+
 def printfiles(level, f1, f2, mod):
     """Indent according to level, then print source and destination file nicely.
 
@@ -186,19 +192,23 @@ def printfiles(level, f1, f2, mod):
 
 
 def remove(path):
-    """Remove whatever path is (file or directory and its contents)."""
+    """Remove path, whether it's a file or a directory and its contents."""
+    deleter = os.remove
+    mpath = _marked(path)
     if os.path.islink(path):
-        print(f"Deleting link {path}.")
-        os.remove(path)
+        print(f"Deleting link {mpath}.")
     elif os.path.isfile(path):
-        print(f"Deleting file {path}.")
-        os.remove(path)
+        print(f"Deleting file {mpath}.")
     elif os.path.isdir(path):
-        print(f"Deleting dir {path}/.")
-        shutil.rmtree(path)
+        print(f"Deleting dir {mpath}/.")
+        deleter = shutil.rmtree
     else:
-        print(f"Don't know how to delete {path}!")
+        print(f"Don't know how to delete {mpath}!")
         sys.exit(1)
+    try:
+        deleter(path)
+    except PermissionError as e:
+        print(f"Couldn't delete {mpath}: {e}")
 
 
 def move(src, dst):
@@ -256,7 +266,7 @@ def walk(root_dir, dest_root, level):
             else:
                 print("")
         else:
-            printfiles(level, abs_f, dest_file, RED)
+            printfiles(level, abs_f, dest_file, YEL)
             print("  Differs.")
 
             # Check for source empty or symlink

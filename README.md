@@ -1,13 +1,20 @@
 ## What it does
-The mergeinator merges a directory (the "source directory") into a similar directory (the
-"destination" which can be a parent of the source directory), eliminating
-duplicates as it goes.  After several runs, the source directory should be gone, merged into
-the destination.
+The mergeinator merges a directory (the "source directory") into a similar directory
+(the "destination," which can be a parent of the source directory), eliminating
+duplicates as it goes.  After several runs, the source directory should be gone,
+merged into the destination.
 
 ## How to run it
 ```
 $ merge old_home_dir_copy ~/
 ```
+
+The `-y` or `--yes` flag causes it to "auto answer" interactive questions with "yes."  If
+you use this, there are cases where you could lose info (conflicting changes in files -- it
+chooses the newer one, when there could be useful changes in the old file as well).
+
+The `-n` or `--dryrun` flag causes `merge` to print the actions it would take, but not
+actually change any files.
 
 ## Why would you want this?
 Every time I make a tarball of my directory tree, I later end up expanding it somewhere
@@ -18,13 +25,13 @@ and takes forever.
 
 ## Better than alternatives
 It's better for this purpose than the commercial de-dup utilities I've found because it
-works on higher-level units first, rather than reporting that you have a dozen identical
-empty .DS_Store files.
+works on higher-level units first, rather than, e.g., reporting that you have a dozen
+identical empty .DS_Store files.
 
 For example, if the destination has a Projects directory with 10 projects, but there is a
-single missing one that's only in the source directory, merge will move the entire missing
-project from the source to the destination's Projects directory (and delete the duplicate
-projects from the source as well).
+single missing one that's only in the source directory, merge will move the one missing
+project in its entirety from the source to the destination's Projects directory (and delete
+the duplicate projects from the source as well).
 
 ## Possible Improvements
 It's a little more work, though.  For directory trees that are only similar, but not

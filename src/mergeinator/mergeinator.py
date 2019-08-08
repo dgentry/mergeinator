@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 
 import datetime
+from shlex import quote
 import sys
 import stat
-import subprocess
+from subprocess import run, STDOUT, PIPE, Popen
+from time import sleep
 import os
 import re
 import shutil
 from sys import stdout
 from colored import fg, style
+import xattr
 
 # Let's use ANSI escape sequence colors if we're on a tty
 if stdout.isatty() or ('TERM' in os.environ and 'color' in os.environ['TERM']):
@@ -135,16 +138,56 @@ def answer(question):
         return str.lower(input(question))
 
 
+def not_dead_gen():
+    spinner_state = 0
+    spinner_map = ['|', '/', '-', '\\']
+
+    while True:
+        # Two chars so spinner doesn't end up under cursor
+        print(f" {spinner_map[spinner_state]}\b\b", end='')
+        sys.stdout.flush()
+        spinner_state = (spinner_state + 1) % len(spinner_map)
+        yield
+
+
 def identical(f1, f2):
     """Return true iff paths f1 and f2 have no diffs.
 
     Permission differences don't count.
+    Prints a spinner while polling the diff for completion.
     """
 
-    cp = subprocess.run(["diff", "-r", "-q", f1, f2], capture_output=True)
-    match = len(cp.stdout) == 0 and len(cp.stderr) == 0
-    # if not match:
-    #     print(WHT + f"{len(cp.stdout)}, {len(cp.stderr)}{cp.stderr}\n" + RESET)
+    # Quick check: If two directories contain different numbers of
+    # items, they are not identical.
+    if os.path.isdir(f1) and os.path.isdir(f2):
+        if len(os.listdir(f1)) != len(os.listdir(f2)):
+            return False
+
+    not_dead = not_dead_gen()
+
+    print(f"{DIM}{WHT}Diff {f1}...{NORMAL}")
+    # TODO: If diff doesn't support --no-dereference, print warning
+    # that it will fail on symlinks with no referent.
+    with Popen(["/usr/local/bin/diff", "-r", "--no-dereference", "-q", quote(f1), quote(f2)],
+               stdout=PIPE, stderr=STDOUT) as p:
+        ret = None
+        while ret is None:
+            ret = p.poll()
+            # Prints next spinner char
+            next(not_dead)
+            sleep(0.1)
+        # If there is a difference, ret should be nonzero and there
+        # should be output reporting the diffs.
+        match = ret == 0
+        output = p.stdout.read()
+        print(f"ret is {ret}, output starts {output[:50]}")
+        if match:
+            assert len(output) == 0
+        else:
+            assert len(output) > 0
+
+        # if not match:
+        #     print(WHT + f"{len(cp.stdout)}, {len(cp.stderr)}{cp.stderr}\n" + NORMAL)
     return match
 
 
@@ -191,16 +234,54 @@ def printfiles(level, f1, f2, mod):
     print(" " * level * 4 + f"{f1}{_dmark(f1)} ?--> {mod}{f2}{_dmark(f2)}{NORMAL}", end="")
 
 
+def kill_xattrs(dir, path):
+    fullpath = dir + '/' + path
+    x = xattr.listxattr(fullpath)
+    if x:
+        print(f"Removing xattrs of {fullpath}:")
+        for k in x:
+            print("  {k}")
+            xattr.removexattr(fullpath, k)
+    else:
+        print(fullpath, "No xattrs")
+
+    tmp = fullpath
+    try:
+        while True:
+            parent = os.path.dirname(tmp)
+            xpar = xattr.listxattr(parent)
+            if xpar:
+                print(f"Removing xattrs of {parent}")
+                for k in xpar:
+                    print(f"  {k}")
+                    xattr.removexattr(parent, k)
+            else:
+                print(parent, "No xattrs")
+            tmp = parent
+    except IOError as e:
+        if e.args[0] == 2: # ("No such file or dir")
+            pass
+        else:
+            raise(e)
+
+    # try:
+    #     del(x['com.apple.FinderInfo'])
+    #     print("Removed com.apple.FinderInfo extended attributes on {parent}")
+    #     deleter(path)
+    # except Exception as fuu:
+    #     print(f"{fuu}:  Didn't find com.apple.FinderInfo on {parent}.  Giving up.")
+
+
 def remove(path):
     """Remove path, whether it's a file or a directory and its contents."""
     deleter = os.remove
     mpath = _marked(path)
     if os.path.islink(path):
-        print(f"Deleting link {mpath}.")
+        print(f"Deleting link {mpath}")
     elif os.path.isfile(path):
-        print(f"Deleting file {mpath}.")
+        print(f"Deleting file {mpath}")
     elif os.path.isdir(path):
-        print(f"Deleting dir {mpath}/.")
+        print(f"Deleting dir {mpath}")
         deleter = shutil.rmtree
     else:
         print(f"Don't know how to delete {mpath}!")
@@ -209,6 +290,21 @@ def remove(path):
         deleter(path)
     except PermissionError as e:
         print(f"Couldn't delete {mpath}: {e}")
+        if e.args[1] == "Operation not permitted":
+            # Empirically, this has been due to MacOS uchg.
+            # It could also be locked with xattrs.
+            try:
+                # TODO:  Call chflags(2) directly
+                run(["chflags", "-R", "nouchg", path])
+                deleter(path)
+                print(f"Deleted {path} after removing nouchg.")
+            except PermissionError as fuu:
+                print(f"Still no joy {fuu}")
+
+            # kill_xattrs(path, e.filename)
+            # try:
+            #     deleter(path)
+            # except PermissionError as e:
 
 
 def move(src, dst):
@@ -217,7 +313,7 @@ def move(src, dst):
 
 
 def finderopen(path):
-    subprocess.run(["open", "-R", path])
+    run(["open", "-R", path])
 
 
 def is_empty(path):
@@ -244,8 +340,12 @@ def do_merge(root_dir, dest_root, level, dry_run_flag, yes_flag):
 
 
 def walk(root_dir, dest_root, level):
-    """For each file in this directory, if it matches the one in the merge destination, offer to
-    delete it."""
+    """For each file in this directory, dispose of it sensibly.
+
+    If it doesn't exist in the destination, offer to move it.
+    If it's empty or a symlink, offer to delete it.
+    If it's identical, offer to delete it.
+    If it differs, report the details and make an offer."""
 
     for fname in os.listdir(root_dir):
         abs_f = os.path.normpath(os.path.join(root_dir, fname))
@@ -255,6 +355,15 @@ def walk(root_dir, dest_root, level):
             safe_move = answer("  Safe.  Move? [Y/n]")
             if safe_move in ["", "y"]:
                 move(abs_f, dest_file)
+                continue
+        elif is_empty(abs_f) or os.path.islink(abs_f):
+            if is_empty(abs_f):
+                reason = "empty"
+            else:
+                reason = "symlink"
+            del_ok = answer(f"{abs_f} is {reason}.  Delete? [Y/D/n]")
+            if del_ok in ["", "y", "d"]:
+                remove(abs_f)
                 continue
         elif identical(abs_f, dest_file):
             printfiles(level, abs_f, dest_file, "")
@@ -266,22 +375,6 @@ def walk(root_dir, dest_root, level):
             else:
                 print(f"Left {abs_f}.")
         else:
-            # The files are different, but that could be because the
-            # source is empty or a symlink, in which case we don't
-            # need to print "Differs."
-
-            # Check for source empty or symlink
-            reason = ""
-            if is_empty(abs_f):
-                reason = "empty"
-            elif os.path.islink(abs_f):
-                reason = "a symlink"
-            if len(reason) > 0:
-                del_ok = answer(f"{abs_f} is {reason}.  Delete? [Y/D/n]")
-                if del_ok in ["", "y", "d"]:
-                    remove(abs_f)
-                    continue
-
             printfiles(level, abs_f, dest_file, YEL)
             print("  Differs.")
 
@@ -303,7 +396,7 @@ def walk(root_dir, dest_root, level):
                       f"({readable_date}).")
 
             # Check for directories we shouldn't open
-            dirtype = re.match(".*\.git$|.*\.xcodeproj$", abs_f)
+            dirtype = re.match(".*\\.git$|.*\\.xcodeproj$", abs_f)
 
             # Report size
             if os.path.isfile(abs_f):
@@ -325,11 +418,11 @@ def walk(root_dir, dest_root, level):
                     del_ok = answer(f"Delete older file ({older_file + _dmark(older_file)}) "
                                     "or show diFf [D/n/f]?")
                     if del_ok == 'f':
-                        rv = subprocess.run(["diff", "-r", abs_f, dest_file], capture_output=True)
+                        rv = run(["diff", "-r", abs_f, dest_file], capture_output=True)
                         print(rv.stdout)
                     if del_ok in ['', 'd', 'y']:
-                            remove(older_file)
-                            continue
+                        remove(older_file)
+                        continue
                     if del_ok == 'n':
                         pass
             if os.path.isdir(abs_f):

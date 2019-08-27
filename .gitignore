@@ -50,3 +50,4 @@ TAGS
 main.profile
 pylint.out.txt
 .pytest_cache/
+src/mergeinator.egg-info

@@ -206,9 +206,11 @@ def identical(f1, f2):
             ret = p.poll()
 
         sofar.extend(chunk)
-        # ui(f"{DIM}{YEL}ret {ret}, output {sofar}{NORMAL}")
         if ret == 2:
-            ui("{RED}Diff returned an unexpected error.{NORMAL}", cmd)
+            ui(f"{DIM}{YEL}ret {ret}, output {sofar}{NORMAL}")
+            ui(f"{RED}Diff returned an unexpected error.{NORMAL}.")
+            ui(f"  While running \"{' '.join(cmd)}\", error was:\n"
+               f"  {YEL}{bunk.decode()}{YEL}.")
             sys.exit(1)
         # If there is a difference (or an error), ret will be nonzero
         match = ret == 0

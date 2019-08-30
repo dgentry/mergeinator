@@ -22,6 +22,6 @@ def cli(source, destination, dryrun, yes):
     """
     my_version = pkg_resources.require("mergeinator")[0].version
     echo(f"Mergeinator {my_version}")
-    echo(f"Merging {WHT}{source}{NORMAL} ({os.path.abspath(source)}) to "
-         f"{WHT}{destination}{NORMAL} ({os.path.abspath(destination)})\n")
+    echo(f"Merging {WHT}{source}{NORMAL} to {WHT}{destination}{NORMAL}\n")
+    echo(f"Full paths: {os.path.abspath(source)} to {os.path.abspath(destination)}\n")
     mergeinator.do_merge(source, destination, 0, yes_flag=yes, dry_run_flag=dryrun)

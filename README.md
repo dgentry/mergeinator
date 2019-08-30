@@ -45,6 +45,17 @@ tests (there are two small unit tests).
 
 Maybe someday I'll put a Mac UI on it.
 
+Visualizing which file differs and which one is newer/older/larger
+might help the user choose better/quicker.
+
+Maybe file on left is always white, file on right is always yellow or
+something like that.  (On black background)
+
+Better Logging
+
+When merging empty directory, (offer to) delete source dir
+
+
 ## To install
 ```
 make install

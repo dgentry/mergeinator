@@ -2,6 +2,7 @@
 
 import click
 from click import echo
+import pkg_resources  # For version number
 import os
 import mergeinator
 from mergeinator import WHT, NORMAL
@@ -16,8 +17,11 @@ def cli(source, destination, dryrun, yes):
     """Merge trims away the source directory by moving its unique content into the destination
     directory.  Duplicate content is discarded.  It may take multiple runs of merge (one per
     level of subdirectory depth) to completely remove all duplicate content because merge
-    won't remove non-empty directories.
+    won't remove non-empty directories, and duplicate directories don't become empty until
+    after they are merged.
     """
+    my_version = pkg_resources.require("mergeinator")[0].version
+    echo(f"Mergeinator {my_version}")
     echo(f"Merging {WHT}{source}{NORMAL} ({os.path.abspath(source)}) to "
          f"{WHT}{destination}{NORMAL} ({os.path.abspath(destination)})\n")
     mergeinator.do_merge(source, destination, 0, yes_flag=yes, dry_run_flag=dryrun)

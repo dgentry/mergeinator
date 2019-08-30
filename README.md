@@ -55,6 +55,16 @@ Better Logging
 
 When merging empty directory, (offer to) delete source dir
 
+Lazy diff -- currently relies on gnu diffutils (I forget the
+deficiency in macOS diff), and as soon as we find any difference, we
+don't need to continue finding additional diffs or details thereof.
+
+Besides '-y' which is slightly berzerk, we could add '--safe-yes'
+which only deletes identical files (not older ones that differ).
+
+Initial announcement of work should print both short names, then on a
+separate line, both full paths.
+
 
 ## To install
 ```

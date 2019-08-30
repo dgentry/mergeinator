@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 
-import datetime
-from shlex import quote
-import sys
-import stat
-from subprocess import run, STDOUT, PIPE, Popen
-from time import sleep
 import os
 import re
 import shutil
-from sys import stdout
+import stat
+import sys
+
 from colored import fg, style
-import xattr
+from datetime import datetime as dt
+from subprocess import run, STDOUT, PIPE, Popen, TimeoutExpired
+from sys import stdout
 
 # Let's use ANSI escape sequence colors if we're on a tty
 if stdout.isatty() or ('TERM' in os.environ and 'color' in os.environ['TERM']):
@@ -43,6 +41,19 @@ SECONDS_IN_WEEK = 7 * SECONDS_IN_DAY
 # These are approximate:
 SECONDS_IN_MONTH = 30 * SECONDS_IN_DAY
 SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY
+
+
+def log(*args, **kwargs):
+    mode = "w+"
+    if os.path.isfile("merge.log"):
+        mode = "a"
+    with open("merge.log", mode) as global_log:
+        print(dt.isoformat(dt.now()), *args, file=global_log, **kwargs)
+
+
+def ui(*args, **kwargs):
+    print(*args, **kwargs)
+    log(*args, **kwargs)
 
 
 def nicedelta(delta_s):
@@ -128,14 +139,16 @@ def nice_size(bytes):
 def answer(question):
     global force_yes
     global dry_run
+    retval = 'n'
     if dry_run:
         print(question, BLD + GRN + "n" + NORMAL)
-        return "n"
     if force_yes:
         print(question, BLD + RED + "y" + NORMAL)
-        return "y"
+        retval = 'y'
     else:
-        return str.lower(input(question))
+        retval = str.lower(input(question))
+    log(question, retval)
+    return retval
 
 
 def not_dead_gen():
@@ -145,7 +158,7 @@ def not_dead_gen():
     while True:
         # Two chars so spinner doesn't end up under cursor
         print(f" {spinner_map[spinner_state]}\b\b", end='')
-        sys.stdout.flush()
+        stdout.flush()
         spinner_state = (spinner_state + 1) % len(spinner_map)
         yield
 
@@ -153,41 +166,52 @@ def not_dead_gen():
 def identical(f1, f2):
     """Return true iff paths f1 and f2 have no diffs.
 
-    Permission differences don't count.
+    Don't count permission differences.
     Prints a spinner while polling the diff for completion.
     """
 
-    # Quick check: If two directories contain different numbers of
-    # items, they are not identical.
+    # Shortcut: If two directories contain different numbers of items,
+    # they aren't identical.
     if os.path.isdir(f1) and os.path.isdir(f2):
         if len(os.listdir(f1)) != len(os.listdir(f2)):
             return False
 
     not_dead = not_dead_gen()
 
-    print(f"{DIM}{WHT}Diff {f1}...{NORMAL}")
+    ui(f"{DIM}Diff {WHT}{f1}...{NORMAL}")
     # TODO: If diff doesn't support --no-dereference, print warning
     # that it will fail on symlinks with no referent.
-    with Popen(["/usr/local/bin/diff", "-r", "--no-dereference", "-q", quote(f1), quote(f2)],
-               stdout=PIPE, stderr=STDOUT) as p:
+    cmd = ["/usr/local/bin/diff", "-r", "--no-dereference", "-q", f1, f2]
+    log(f"{DIM}{WHT}Diff cmd: {cmd}...{NORMAL}")
+    sofar = bytearray(b'')
+    chunk = bytearray(b'')
+    import io
+    # ui(f"io.DEF {io.DEFAULT_BUFFER_SIZE}.")
+    with Popen(cmd, stdout=PIPE, stderr=PIPE, bufsize=100 * io.DEFAULT_BUFFER_SIZE) as p:
         ret = None
+        # ui("Popened.")
         while ret is None:
-            ret = p.poll()
+            try:
+                (chunk, bunk) = p.communicate(timeout=0.1)
+                # ui("Chunk: ", chunk, ".")
+                # ui("Bunk: ", bunk, ".")
+                if len(chunk) > 0:
+                    sofar.extend(chunk)
+                    chunk = bytearray(b'')
+            except TimeoutExpired:
+                # Maybe need to read last chunk?
+                pass
             # Prints next spinner char
             next(not_dead)
-            sleep(0.1)
-        # If there is a difference, ret should be nonzero and there
-        # should be output reporting the diffs.
-        match = ret == 0
-        output = p.stdout.read()
-        print(f"ret is {ret}, output starts {output[:50]}")
-        if match:
-            assert len(output) == 0
-        else:
-            assert len(output) > 0
+            ret = p.poll()
 
-        # if not match:
-        #     print(WHT + f"{len(cp.stdout)}, {len(cp.stderr)}{cp.stderr}\n" + NORMAL)
+        sofar.extend(chunk)
+        # ui(f"{DIM}{YEL}ret {ret}, output {sofar}{NORMAL}")
+        if ret == 2:
+            ui("{RED}Diff returned an unexpected error.{NORMAL}", cmd)
+            sys.exit(1)
+        # If there is a difference (or an error), ret will be nonzero
+        match = ret == 0
     return match
 
 
@@ -217,79 +241,38 @@ def _dmark(path):
         return ""
 
 
-def _marked(path):
+def _mark(path):
     """Return path with a type indication appended."""
-
     return path + _dmark(path)
 
 
-def printfiles(level, f1, f2, mod):
-    """Indent according to level, then print source and destination file nicely.
+def printfiles(f1, f2, mod1, mod2):
+    """Print source and destination file with mod1 and mod2.
 
     Args:
-        level: depth from root in source tree.
-        f1, f2:  filenames to print.
-        mod:  color/bold/dim modifier
+        f1, f2: filenames to print.
+        mod1, mod2: color/bold/dim modifier
     """
-    print(" " * level * 4 + f"{f1}{_dmark(f1)} ?--> {mod}{f2}{_dmark(f2)}{NORMAL}", end="")
-
-
-def kill_xattrs(dir, path):
-    fullpath = dir + '/' + path
-    x = xattr.listxattr(fullpath)
-    if x:
-        print(f"Removing xattrs of {fullpath}:")
-        for k in x:
-            print("  {k}")
-            xattr.removexattr(fullpath, k)
-    else:
-        print(fullpath, "No xattrs")
-
-    tmp = fullpath
-    try:
-        while True:
-            parent = os.path.dirname(tmp)
-            xpar = xattr.listxattr(parent)
-            if xpar:
-                print(f"Removing xattrs of {parent}")
-                for k in xpar:
-                    print(f"  {k}")
-                    xattr.removexattr(parent, k)
-            else:
-                print(parent, "No xattrs")
-            tmp = parent
-    except IOError as e:
-        if e.args[0] == 2: # ("No such file or dir")
-            pass
-        else:
-            raise(e)
-
-    # try:
-    #     del(x['com.apple.FinderInfo'])
-    #     print("Removed com.apple.FinderInfo extended attributes on {parent}")
-    #     deleter(path)
-    # except Exception as fuu:
-    #     print(f"{fuu}:  Didn't find com.apple.FinderInfo on {parent}.  Giving up.")
+    ui(f"{mod1}{f1}{_dmark(f1)}{NORMAL} ?--> {mod2}{f2}{_dmark(f2)}{NORMAL}", end="")
 
 
 def remove(path):
-    """Remove path, whether it's a file or a directory and its contents."""
+    """Remove path, whether it's a file, or a directory and its contents."""
     deleter = os.remove
-    mpath = _marked(path)
+    mpath = _mark(path)
     if os.path.islink(path):
-        print(f"Deleting link {mpath}")
+        log(f"Deleting link {mpath}")
     elif os.path.isfile(path):
-        print(f"Deleting file {mpath}")
+        log(f"Deleting file {mpath}")
     elif os.path.isdir(path):
-        print(f"Deleting dir {mpath}")
+        log(f"Deleting dir {mpath}")
         deleter = shutil.rmtree
     else:
-        print(f"Don't know how to delete {mpath}!")
+        ui(f"Don't know how to delete {mpath}!")
         sys.exit(1)
     try:
         deleter(path)
     except PermissionError as e:
-        print(f"Couldn't delete {mpath}: {e}")
         if e.args[1] == "Operation not permitted":
             # Empirically, this has been due to MacOS uchg.
             # It could also be locked with xattrs.
@@ -297,19 +280,24 @@ def remove(path):
                 # TODO:  Call chflags(2) directly
                 run(["chflags", "-R", "nouchg", path])
                 deleter(path)
-                print(f"Deleted {path} after removing nouchg.")
+                ui(f"Deleted {path} after removing nouchg.")
             except PermissionError as fuu:
-                print(f"Still no joy {fuu}")
-
-            # kill_xattrs(path, e.filename)
-            # try:
-            #     deleter(path)
-            # except PermissionError as e:
+                ui(f"Couldn't delete {mpath}: {e} and {fuu}")
 
 
-def move(src, dst):
-    print(f"Moving {src} to {dst}.")
-    shutil.move(src, dst)
+def move(src, dest):
+    # ui(f"{DIM}Moving {WHT}{_mark(src)}{NORMAL}{DIM} to {dest_abbrev}{NORMAL}")
+    log(f"Moving {WHT}{_mark(src)}{NORMAL} to {dest_abbrev}")
+    try:
+        shutil.move(src, dest)
+    except FileExistsError as e:
+        # ui(f"Uh. . . .  {e}, {dir(e)}")
+        # ui(f"Errno: {e.errno}, filename: {e.filename} args: {e.args}")
+        if os.path.islink(dest) and not os.path.exists(dest):
+            ui(f"Destination {_mark(dest)} is a symlink that points nowhere.  "
+               f"{RED}Skipping{NORMAL}.")
+        else:
+            raise(e)
 
 
 def finderopen(path):
@@ -329,17 +317,21 @@ def is_empty(path):
     return False
 
 
-def do_merge(root_dir, dest_root, level, dry_run_flag, yes_flag):
-    """Set global flags and call initial walk()."""
+def do_merge(src, dest, level, dry_run_flag, yes_flag):
+    """Top-level call from CLI, set global flags and call initial walk()."""
 
     global force_yes
     global dry_run
+    global dest_dir
+    global dest_abbrev
     force_yes = yes_flag
     dry_run = dry_run_flag
-    walk(root_dir, dest_root, level)
+    dest_dir = dest
+    dest_abbrev = dest_dir + "/. . ."
+    walk(src, dest_dir, level)
 
 
-def walk(root_dir, dest_root, level):
+def walk(src_dir, dest_dir, level):
     """For each file in this directory, dispose of it sensibly.
 
     If it doesn't exist in the destination, offer to move it.
@@ -347,11 +339,11 @@ def walk(root_dir, dest_root, level):
     If it's identical, offer to delete it.
     If it differs, report the details and make an offer."""
 
-    for fname in os.listdir(root_dir):
-        abs_f = os.path.normpath(os.path.join(root_dir, fname))
-        dest_file = os.path.normpath(os.path.join(dest_root, fname))
+    for fname in os.listdir(src_dir):
+        abs_f = os.path.normpath(os.path.join(src_dir, fname))
+        dest_file = os.path.normpath(os.path.join(dest_dir, fname))
         if not os.path.exists(dest_file):
-            printfiles(level, abs_f, dest_file, DIM)
+            printfiles(abs_f, dest_abbrev, WHT, DIM)
             safe_move = answer("  Safe.  Move? [Y/n]")
             if safe_move in ["", "y"]:
                 move(abs_f, dest_file)
@@ -366,25 +358,25 @@ def walk(root_dir, dest_root, level):
                 remove(abs_f)
                 continue
         elif identical(abs_f, dest_file):
-            printfiles(level, abs_f, dest_file, "")
-            print("  Identical.", end="")
+            printfiles(abs_f, dest_abbrev, WHT, "")
+            ui("  Identical.", end="")
             merge = answer("  Delete? [Y/n]")
             if merge in ["", "y"]:
                 remove(abs_f)
                 continue
             else:
-                print(f"Left {abs_f}.")
+                ui(f"Left {abs_f}.")
         else:
-            printfiles(level, abs_f, dest_file, YEL)
-            print("  Differs.")
+            printfiles(abs_f, dest_abbrev, WHT, YEL)
+            ui("  Differs.")
 
             # Check mod times
             abs_f_mtime = os.path.getmtime(abs_f)
             dest_f_mtime = os.path.getmtime(dest_file)
-            dt = datetime.datetime.fromtimestamp(dest_f_mtime)
-            readable_date = dt.strftime("%Y-%m-%d %H:%M:%S")
+            ds = dt.fromtimestamp(dest_f_mtime)
+            readable_date = ds.strftime("%Y-%m-%d %H:%M:%S")
             if abs_f_mtime == dest_f_mtime:
-                print(f"Both files have the same modification time ({abs_f_mtime}).")
+                ui(f"Both have the same modification time ({abs_f_mtime}).")
             else:
                 diff = abs(abs_f_mtime - dest_f_mtime)
                 amount = nicedelta(diff)
@@ -392,8 +384,8 @@ def walk(root_dir, dest_root, level):
                     op = "newer"
                 else:
                     op = "older"
-                print(f"{abs_f} is {amount}seconds {op} than {dest_file}{_dmark(dest_file)} "
-                      f"({readable_date}).")
+                    ui(f"{WHT}{_mark(abs_f)}{NORMAL} is {amount} {op} than "
+                       f"{YEL}{dest_abbrev}{NORMAL} ({readable_date}).")
 
             # Check for directories we shouldn't open
             dirtype = re.match(".*\\.git$|.*\\.xcodeproj$", abs_f)
@@ -403,9 +395,10 @@ def walk(root_dir, dest_root, level):
                 asize = os.path.getsize(abs_f)
                 dsize = os.path.getsize(dest_file)
                 if asize == dsize:
-                    print(f"Both are {nice_size(asize)}.")
+                    ui(f"Both are {nice_size(asize)}.")
                 else:
-                    print(f"{abs_f} is {nice_size(asize)}, {dest_file} is {nice_size(dsize)}.")
+                    ui(f"{WHT}{abs_f}{NORMAL} is {nice_size(asize)}, "
+                       f"{YEL}{dest_abbrev}{NORMAL} is {nice_size(dsize)}.")
 
             # If this is a flatfile or monolithic directory, offer to delete older
             if os.path.isfile(abs_f) or dirtype:
@@ -413,14 +406,14 @@ def walk(root_dir, dest_root, level):
                     older_file = dest_file
                 else:
                     older_file = abs_f
-                del_ok = "f"
-                while del_ok == 'f':
-                    del_ok = answer(f"Delete older file ({older_file + _dmark(older_file)}) "
-                                    "or show diFf [D/n/f]?")
-                    if del_ok == 'f':
+                del_ok = "d"
+                while del_ok == 'd':
+                    del_ok = answer(f"[R]emove older file ({older_file + _dmark(older_file)}) "
+                                    "or show [d]iff [R/n/d]?")
+                    if del_ok == 'd':
                         rv = run(["diff", "-r", abs_f, dest_file], capture_output=True)
-                        print(rv.stdout)
-                    if del_ok in ['', 'd', 'y']:
+                        ui(rv.stdout)
+                    if del_ok in ['', 'r', 'y']:
                         remove(older_file)
                         continue
                     if del_ok == 'n':
@@ -428,7 +421,8 @@ def walk(root_dir, dest_root, level):
             if os.path.isdir(abs_f):
                 abs_f_entries = len(os.listdir(abs_f))
                 dest_entries = len(os.listdir(dest_file))
-                print(f"{abs_f} holds {abs_f_entries} files, {dest_file} holds {dest_entries}.")
+                ui(f"{WHT}{abs_f}{NORMAL} has {abs_f_entries} files, "
+                   f"{dest_abbrev} has {dest_entries}.")
 
                 # Ask for help
                 if os.path.isdir(abs_f):
@@ -439,4 +433,4 @@ def walk(root_dir, dest_root, level):
                         finderopen(abs_f)
                         finderopen(dest_file)
                     elif action == "s":
-                        print("Skipping.")
+                        ui("Skipping.")

@@ -64,11 +64,19 @@ which only deletes identical files (not older ones that differ).
 
 
 ## To install
+On Mac, install GNU diff.
+```
+brew install gnudiff
+```
+
+
 ```
 make install
 ```
 
 If there is interest, I'll put it on pypi.
+
+
 
 ## Developer Notes
 Packaged according to this scheme, which seems extremely sensible:

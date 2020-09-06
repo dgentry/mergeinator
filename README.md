@@ -77,9 +77,8 @@ Maybe someday I'll put a Mac UI on it.
 Visualizing which file differs and which one is newer/older/larger
 might help the user choose better/quicker.
 
-Maybe the ASCII UI could have the file on left is always white, file
-on right is always yellow or something like that.  (On black
-background)
+Maybe the ASCII UI could have the file on left be always white, file
+on right always yellow or something like that.  (On black background)
 
 The logging is better than it was, but could probably be more readable.
 
@@ -95,9 +94,12 @@ pair of files differ in length, that pair, and any pair of parent
 directory trees, definitely differ.
 
 There could be a quicker, yet safe flag, perhaps `--safe-yes`.  The
-'-y' flag is slightly berzerk in that it arbitrarily chooses to delete
-the older versions of files that differ.  '--safe-yes' might only
-deletes identical files (not older ones that differ).
+`-y` flag is slightly berzerk in that it arbitrarily chooses to delete
+the older versions of files that differ.  `--Safe-yes` should only
+delete identical files (not older ones that differ).
+
+For older/newer differing files, it could offer more ways to figure
+out which one you want and/or merge them.
 
 The quick answer choices could have clearer one-letter
 answers/defaults.

@@ -1,8 +1,9 @@
 ## What it does
-The mergeinator merges a directory (the "source directory") into a similar directory
-(the "destination," which can be a parent of the source directory), eliminating
-duplicates as it goes.  After several runs, the source directory should be gone,
-merged into the destination.
+The mergeinator merges a directory (the "source directory") into a
+similar directory (the "destination," which can be a parent of the
+source directory), eliminating duplicate in the source directory as it
+goes.  After several runs, the source directory is gone, merged into
+the destination.
 
 ## How to run it
 ```
@@ -23,6 +24,10 @@ my real tree.  Cleaning it up is a pain because if you just delete the whole thi
 might lose some stuff you want.  Merging stuff you might want manually first is error-prone
 and takes forever.
 
+It also seems to work when merging two similar iPhoto or iTunes
+libraries, although iPhoto needs a re-index afterwards.  (Probably
+iTunes does too, I just haven't noticed.)
+
 ## Better than alternatives
 It's better for this purpose than the commercial de-dup utilities I've found because it
 works on higher-level units first, rather than, e.g., reporting that you have a dozen
@@ -34,14 +39,16 @@ project in its entirety from the source to the destination's Projects directory 
 the duplicate projects from the source as well).
 
 ## Possible Improvements
-It's a little more work, though.  For directory trees that are only similar, but not
-identical, each pass may only merge one layer of directory hierarchy; so to fully merge and
-eliminate the source directory, you may have to run it as many times as the depth of your
+It requires multiple passes.  For directory trees that are only
+similar, but not identical, each pass may only merge one layer of
+directory hierarchy; so to fully merge and eliminate the source
+directory, you may have to run it as many times as the depth of your
 hierarchy.
 
-It's also not particularly well tested (either in real-world usage, where it has helped me
-clean up several longstanding near-duplicate directory trees) or in unit- or integration
-tests (there are two small unit tests).
+It's only slightly tested (either in real-world usage, where it has
+helped me clean up several longstanding near-duplicate directory
+trees) or in unit- or integration tests (there are two small unit
+tests).
 
 Maybe someday I'll put a Mac UI on it.
 
@@ -55,22 +62,30 @@ Better Logging
 
 When merging empty directory, (offer to) delete source dir
 
-Lazy diff -- currently relies on gnu diffutils (I forget the
-deficiency in macOS diff), and as soon as we find any difference, we
-don't need to continue finding additional diffs or details thereof.
+I don't think it does a lazy diff.  It currently relies solely on gnu
+diffutils (I forget the deficiency in macOS diff), and as soon as we
+find any difference, we don't need to continue finding additional
+diffs or details thereof.  An even quicker check would be file size --
+if the files are different sizes, they definitely differ.
 
-Besides '-y' which is slightly berzerk, we could add '--safe-yes'
-which only deletes identical files (not older ones that differ).
+Besides '-y' which is slightly berzerk in that it arbitrarily chooses
+to delete the older versions of files that differ, we could add
+'--safe-yes' which only deletes identical files (not older ones that
+differ).
 
 
 ## To install
-On Mac, install GNU diff.
+You'll need Python 3.6 or newer, and gnudiff (typically the default on most Linux distros, but not MacOS).
+
+On Mac, install Python 3 and GNU diff.
 ```
-brew install gnudiff
+brew install python3 gnudiff
 ```
 
-
+Fetch the repo and build:
 ```
+git clone https://github.com/dgentry/mergeinator
+cd mergeinator
 make install
 ```
 

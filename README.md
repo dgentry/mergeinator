@@ -1,45 +1,57 @@
 ## What it does
 Clean up your files and recover disk space with The Merginator.
 
-The Mergeinator merges a directory (the "source directory") into a
-similar directory (the "destination," which can be a parent of the
-source directory), eliminating duplicate in the source directory as it
-goes.  After several runs, the source directory is gone, merged into
-the destination.
+The Mergeinator efficiently merges a directory tree (the "source")
+into a similar directory tree (the "destination"), eliminating
+duplicates from the source directory as it goes.  After several runs,
+the source directory is gone, merged into the destination.  (It works
+even when the source directory is inside the destination, which is
+useful when you've expanded a tarball of your home directory within
+it.)
 
 
 ## How to run it
 ```
 $ merge old_home_dir_copy ~/
 ```
-I usually run it "manually" (as above) and answer the questions it
+I run it "manually" (as above) and answer the questions it
 asks a few times.  This lets me confirm that it's doing what I
 intended.  When I get tired of answering questions, I re-run it with
-the `-y` flag.
+the `-y` flag and let 'er rip.
 
-The `-y` or `--yes` flag causes it to "auto answer" interactive
-questions with "yes."  If you use this, there are cases where you
-could lose info (conflicting changes in files -- it arbitrarily
-chooses the newer one, when there could be useful changes in the old
-file as well).
+The `-y` or `--yes` flag causes it to "auto answer" questions with
+"yes."  It is possible to lose info with this flag.  When there are
+conflicting changes in files, it arbitrarily chooses the newer one,
+when there could be useful changes in the old file as well.
 
-If you are extra cautious, the `-n` or `--dryrun` flag causes `merge`
-to print the actions it would take, but not actually change any files.
-Without `-n`, it will make "safe" (i.e., reversible) changes without
-asking, for example, when two files are identical, it will delete the
-source version, which you could (perhaps painstakingly) restore with a
-`cp <dest> <source>` if you later decided it was a mistake.  All
-operations are logged in `merge.log`.
+If you are cautious, your first run could be with the `-n` or
+`--dryrun` flag, which causes `merge` to print the actions it would
+take, but not actually change any files.
+
+Without any flags, `merge` will only make "safe" (i.e., reversible)
+changes without asking.  For example, when two files are identical, it
+will delete the source version, which you could (perhaps
+painstakingly) restore with a `cp <dest> <source>` if you later
+decided it was a mistake.  All operations are logged in `merge.log`.
 
 
 ## Why would you want this?
 
-Every time I make a tarball of my directory tree, I later end up
-expanding it somewhere within my directory tree, so I end up with a
-mostly older copy of my main tree embedded in my real tree.  Cleaning
-it up is a pain because if you just delete the whole thing, you might
-lose some stuff you want.  Merging stuff you might want manually first
-is error-prone and takes forever.
+Everyone ends up with duplicate files or directory trees sometimes,
+which clutter up your hierarchy and possibly double or triple the
+storage space you need.
+
+In particular, every time I make a tarball of (a part of) my directory
+tree for safekeeping, I later end up expanding it somewhere within my
+directory tree, so I end up with a mostly older copy of my main tree
+embedded in my current tree.  Cleaning it up is a pain because if you
+just delete the whole thing, you might lose some stuff you want.
+Manually looking for and saving that stuff (with, say, `diff -r` and
+then `mv`) is error-prone and takes forever.  [Perhaps the real lesson
+is don't make these dumb safekeeping tarballs in the first place, but
+somehow I've always ended up with one when I've moved from one primary
+computer to another.  I am better at using `git` correctly in the
+first place now.]
 
 It also seems to work when merging two similar iPhoto or iTunes
 libraries, although iPhoto needs a re-index afterwards.  (Probably
@@ -60,6 +72,7 @@ entirety from the source to the destination's Projects directory (and
 delete the duplicate projects from the source as well), leaving your
 destination directory complete and organized.
 
+
 ## Possible Improvements
 Ideally, merging would work by generating a merge plan for the entire
 pair of directories, then carrying it out in one pass.  That might be
@@ -74,7 +87,7 @@ helped me clean up several longstanding near-duplicate directory
 trees) or in unit- or integration tests (there are two small unit
 tests).
 
-Maybe someday I'll put a Mac UI on it.
+Someday a Mac UI might be helpful to non-command-line users.
 
 Visualizing which file differs and which one is newer/older/larger
 might help the user choose better/quicker.
@@ -82,7 +95,7 @@ might help the user choose better/quicker.
 Maybe the ASCII UI could have the file on left be always white, file
 on right always yellow or something like that.  (On black background)
 
-The logging is better than it was, but could probably be more readable.
+Logging is better than it was, but could probably be more readable.
 
 When merging an empty source directory, (offer to?) delete it.  (This
 would be the last pass if you have made multiple runs.)

@@ -62,7 +62,7 @@ iTunes also needs some kind of re-index but I haven't noticed that.)
 It's better for de-duping your stuff than the commercial de-dup
 utilities I've found because it works on higher-level units (say,
 entire directory trees) first, rather than, e.g., reporting that you
-have a dozen identical empty .DS_Store files, which isn't that
+have a dozen identical empty `.DS_Store` files, which isn't that
 helpful.
 
 For example, if the destination has a Projects directory with 10

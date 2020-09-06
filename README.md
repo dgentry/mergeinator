@@ -61,11 +61,13 @@ delete the duplicate projects from the source as well), leaving your
 destination directory complete and organized.
 
 ## Possible Improvements
-It requires multiple passes.  For directory trees that are only
-similar, but not identical, each pass may only merge one layer of
-directory hierarchy; so to fully merge and eliminate the source
-directory, you may have to run it as many times as the depth of your
-hierarchy.
+Ideally, merging would work by generating a merge plan for the entire
+pair of directories, then carrying it out in one pass.  That might be
+easiest with a fresh rewrite.  (It currently requires multiple passes.
+For directory trees that are only similar, but not identical, each
+pass may only merge one layer of directory hierarchy; so to fully
+merge and eliminate the source directory, you may have to run it as
+many times as the depth of your hierarchy.)
 
 It's only lightly tested (either in real-world usage, where it has
 helped me clean up several longstanding near-duplicate directory

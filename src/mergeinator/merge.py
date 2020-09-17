@@ -3,9 +3,8 @@
 import click
 from click import echo
 import pkg_resources  # For version number
-import os
-import mergeinator
-from mergeinator import WHT, NORMAL
+from os.path import abspath
+from mergeinator import WHT, NORMAL, DIM, do_merge
 
 
 @click.command()
@@ -23,5 +22,5 @@ def cli(source, destination, dryrun, yes):
     my_version = pkg_resources.require("mergeinator")[0].version
     echo(f"Mergeinator {my_version}")
     echo(f"Merging {WHT}{source}{NORMAL} to {WHT}{destination}{NORMAL}\n")
-    echo(f"Full paths: {os.path.abspath(source)} to {os.path.abspath(destination)}\n")
-    mergeinator.do_merge(source, destination, 0, yes_flag=yes, dry_run_flag=dryrun)
+    echo(f"Full paths: {abspath(source)} to {abspath(destination)}\n")
+    do_merge(source, destination, 0, yes_flag=yes, dry_run_flag=dryrun)

@@ -6,33 +6,11 @@ import shutil
 import stat
 import sys
 
-from colored import fg, style
 from datetime import datetime as dt
 from subprocess import run, STDOUT, PIPE, Popen, TimeoutExpired
-from sys import stdout
 
-# Let's use ANSI escape sequence colors if we're on a tty
-if stdout.isatty() or ('TERM' in os.environ and 'color' in os.environ['TERM']):
-    WHT = fg('white')
-    GRN = fg('green')
-    YEL = fg('yellow')
-    RED = fg('red')
-    BLD = style.BOLD
-    NORMAL = style.RESET
-    RESET = "\x1b[39m"
-    DIM = style.DIM
-# But don't pollute a logfile with escape sequences
-else:
-    WHT = ''
-    GRN = ''
-    YEL = ''
-    RED = ''
-    BLD = ''
-    NORMAL = ''
-    RESET = ''
-    DIM = ''
-BLDWHT = BLD + WHT
-BLDRED = BLD + RED
+from .logs import BLD, GRN, WHT, NORMAL, DIM
+
 
 SECONDS_IN_MINUTE = 60
 SECONDS_IN_HOUR = 60 * SECONDS_IN_MINUTE
@@ -158,7 +136,7 @@ def not_dead_gen():
     while True:
         # Two chars so spinner doesn't end up under cursor
         print(f" {spinner_map[spinner_state]}\b\b", end='')
-        stdout.flush()
+        sys.stdout.flush()
         spinner_state = (spinner_state + 1) % len(spinner_map)
         yield
 

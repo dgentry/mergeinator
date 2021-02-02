@@ -9,7 +9,7 @@ import sys
 from datetime import datetime as dt
 from subprocess import run, STDOUT, PIPE, Popen, TimeoutExpired
 
-from .logs import BLD, GRN, WHT, NORMAL, DIM
+from .logs import BLD, GRN, WHT, YEL, NORMAL, DIM
 
 
 SECONDS_IN_MINUTE = 60

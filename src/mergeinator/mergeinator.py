@@ -9,7 +9,7 @@ import sys
 from datetime import datetime as dt
 from subprocess import run, STDOUT, PIPE, Popen, TimeoutExpired
 
-from .logs import BLD, GRN, WHT, YEL, NORMAL, DIM
+from .logs import BLD, GRN, WHT, YEL, RED, NORMAL, DIM
 
 
 SECONDS_IN_MINUTE = 60
@@ -130,6 +130,7 @@ def answer(question):
 
 
 def not_dead_gen():
+    """I'm not dead, Jim"""
     spinner_state = 0
     spinner_map = ['|', '/', '-', '\\']
 
@@ -141,6 +142,47 @@ def not_dead_gen():
         yield
 
 
+def unstick(file):
+    """Make an attempt to make FILE readable and deleteable."""
+
+    def my_run(cmd):
+        ui(f"Running {cmd}")
+        result = run([cmd])
+        ui(f"Result: {result.returncode}")
+        return result.returncode
+
+    def examine(file):
+        return my_run(["ls", "-dle@O", file])
+
+    ret = examine(file)
+    if ret.returncode == 0:
+        path_to_fix = file
+    if ret.returncode == 1:
+        # ls didn't even work.  Try to fix the parent dir.
+        path_to_fix = os.path.dirname(file)
+        ret = examine(dirname)
+
+    my_run(["chmod", "u+rwx", path_to_fix])
+    my_run(["chmod", "-RN", path_to_fix])
+
+    # Maybe it worked?
+    return True
+
+
+
+def safe_len(path):
+    if not os.path.isdir(path):
+        ui(f"{path} isn't a directory.")
+        return -1
+    try:
+        listing = os.listdir(path)
+    except PermissionError as e:
+        ui(f"Couldn't list {path} due to permission error.")
+        unstick(path)
+        ui(f"It might work to retry now.")
+        sys.exit(1)
+    return len(listing)
+
 def identical(f1, f2):
     """Return true iff paths f1 and f2 have no diffs.
 
@@ -148,10 +190,16 @@ def identical(f1, f2):
     Prints a spinner while polling the diff for completion.
     """
 
-    # Shortcut: If two directories contain different numbers of items,
+    # If one path is a directory and the other is a file, they aren't identical.
+    # Also, we have to check this case, because diff will fail on it.
+    if not os.path.isdir(f1) == os.path.isdir(f2):
+        ui("Weird Case: one dir, one non-dir")
+        return False
+
+    # Cheap shortcut: If two directories contain different numbers of items,
     # they aren't identical.
     if os.path.isdir(f1) and os.path.isdir(f2):
-        if len(os.listdir(f1)) != len(os.listdir(f2)):
+        if safe_len(f1) != safe_len(f2):
             return False
 
     not_dead = not_dead_gen()
@@ -187,9 +235,12 @@ def identical(f1, f2):
         if ret == 2:
             ui(f"{DIM}{YEL}ret {ret}, output {sofar}{NORMAL}")
             ui(f"{RED}Diff returned an unexpected error.{NORMAL}.")
+            err_msg = bunk.decode()
             ui(f"  While running \"{' '.join(cmd)}\", error was:\n"
-               f"  {YEL}{bunk.decode()}{YEL}.")
-            sys.exit(1)
+               f"  {YEL}{err_msg}{YEL}.\n")
+            if not "Permission denied" in err_msg:
+                sys.exit(1)
+            ui("Continuing after permission error.")
         # If there is a difference (or an error), ret will be nonzero
         match = ret == 0
     return match
@@ -237,7 +288,7 @@ def printfiles(f1, f2, mod1, mod2):
 
 
 def remove(path):
-    """Remove path, whether it's a file, or a directory and its contents."""
+    """Remove path, whether it's a file or a directory (and its contents)."""
     deleter = os.remove
     mpath = _mark(path)
     if os.path.islink(path):
@@ -278,6 +329,17 @@ def move(src, dest):
                f"{RED}Skipping{NORMAL}.")
         else:
             raise(e)
+    except PermissionError as e:
+        ui(f"{RED}Yo, Move Permission Error.{NORMAL}")
+        if unstick(src):
+            ui("It could possibly work to re-run.")
+        ui("Bye for now.")
+        sys.exit(1)
+    except Exception as e:
+        ui(f"{RED}Ah HA!")
+        raise(e)
+
+
 
 
 def finderopen(path):
@@ -291,7 +353,12 @@ def is_empty(path):
         if os.path.getsize(path) == 0:
             return True
     if os.path.isdir(path):
-        files = os.listdir(path)
+        try:
+            files = os.listdir(path)
+        except PermissionError as e:
+            ui(f"Can't list dir {WHT}{path}{NORMAL}: {YEL}{e}{NORMAL}")
+            unstick(path)
+            sys.exit(1)
         if len(files) == 0:
             return True
     return False
@@ -368,7 +435,7 @@ def walk(src_dir, dest_dir, level):
                        f"{YEL}{dest_abbrev}{NORMAL} ({readable_date}).")
 
             # Check for directories we shouldn't open
-            dirtype = re.match(".*\\.git$|.*\\.xcodeproj$", abs_f)
+            dirtype = re.match(".*\\.git$|.*\\.xcodeproj$|.*\\.nib$", abs_f)
 
             # Report size
             if os.path.isfile(abs_f):
@@ -391,6 +458,7 @@ def walk(src_dir, dest_dir, level):
                     del_ok = answer(f"[R]emove older file ({older_file + _dmark(older_file)}) "
                                     "or show [d]iff [R/n/d]?")
                     if del_ok == 'd':
+                        ui("\n{BOLD}Showing Diff{NORMAL}")
                         rv = run(["diff", "-r", abs_f, dest_file], capture_output=True)
                         ui(rv.stdout)
                     if del_ok in ['', 'r', 'y']:
@@ -399,6 +467,11 @@ def walk(src_dir, dest_dir, level):
                     if del_ok == 'n':
                         pass
             if os.path.isdir(abs_f):
+                # Weird case: Source dir, dest file
+                if not os.path.isdir(dest_file):
+                    ui(f"{WHT}{abs_f}{NORMAL} is a dir with {abs_f_entries} files, "
+                       f"{dest_abbrev} is a plain file.  Not sure what to do.")
+                    sys.exit();
                 abs_f_entries = len(os.listdir(abs_f))
                 dest_entries = len(os.listdir(dest_file))
                 ui(f"{WHT}{abs_f}{NORMAL} has {abs_f_entries} files, "

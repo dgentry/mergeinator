@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""CLI wrapper for mergeinator()"""
 
 import click
 from click import echo

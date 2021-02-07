@@ -146,10 +146,11 @@ def unstick(file):
     """Make an attempt to make FILE readable and deleteable."""
 
     def my_run(cmd):
-        ui(f"Running {cmd}")
-        result = run([cmd])
-        ui(f"Result: {result.returncode}")
-        return result.returncode
+        first = " ".join(cmd[:-1])
+        lastarg = cmd[-1]
+        ui(f"Running {WHT}{first} \"{lastarg}\"{NORMAL}")
+        result = run(cmd)
+        return result
 
     def examine(file):
         return my_run(["ls", "-dle@O", file])
@@ -164,10 +165,10 @@ def unstick(file):
 
     my_run(["chmod", "u+rwx", path_to_fix])
     my_run(["chmod", "-RN", path_to_fix])
-
+    my_run(["chmod", "-h", "-a", "everyone deny write,delete,append,writeattr,writeextattr,chown", path_to_fix])
+    my_run(["xattr", "-rcs", path_to_fix])
     # Maybe it worked?
     return True
-
 
 
 def safe_len(path):
@@ -390,6 +391,13 @@ def walk(src_dir, dest_dir, level):
         abs_f = os.path.normpath(os.path.join(src_dir, fname))
         dest_file = os.path.normpath(os.path.join(dest_dir, fname))
         if not os.path.exists(dest_file):
+            if os.path.islink(dest_file):
+                ui(f"{YEL}Destination {WHT}\"{dest_file}\"{YEL} is a symlink "
+                   "that points nowhere.")
+                del_ok = answer("Delete or skip? [Y/D/s/n]")
+                if del_ok in ["", "y", "d"]:
+                    remove(dest_file)
+                    continue
             printfiles(abs_f, dest_abbrev, WHT, DIM)
             safe_move = answer("  Safe.  Move? [Y/n]")
             if safe_move in ["", "y"]:

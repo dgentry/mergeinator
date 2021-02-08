@@ -208,6 +208,11 @@ def identical(f1, f2):
     ui(f"{DIM}Diff {WHT}{f1}...{NORMAL}")
     # TODO: If diff doesn't support --no-dereference, print warning
     # that it will fail on symlinks with no referent.
+    # GNU diff duplicates the last path element if it's a dir with no "/"
+    if os.path.isdir(f1):
+        f1 = f1 + "/"
+    if os.path.isdir(f2):
+        f2 = f2 + "/"
     cmd = ["/usr/local/bin/diff", "-r", "--no-dereference", "-q", f1, f2]
     log(f"{DIM}{WHT}Diff cmd: {cmd}...{NORMAL}")
     sofar = bytearray(b'')
@@ -290,6 +295,7 @@ def printfiles(f1, f2, mod1, mod2):
 
 def remove(path):
     """Remove path, whether it's a file or a directory (and its contents)."""
+    ui(f"Here comes remove {path}.")
     deleter = os.remove
     mpath = _mark(path)
     if os.path.islink(path):
@@ -319,23 +325,33 @@ def remove(path):
 
 def move(src, dest):
     # ui(f"{DIM}Moving {WHT}{_mark(src)}{NORMAL}{DIM} to {dest_abbrev}{NORMAL}")
+
+    def trymove(s, d):
+        try:
+            shutil.move(s, d)
+        except FileExistsError as e:
+            # ui(f"Uh. . . .  {e}, {dir(e)}")
+            # ui(f"Errno: {e.errno}, filename: {e.filename} args: {e.args}")
+            if os.path.islink(d) and not os.path.exists(d):
+                ui(f"Destination {_mark(dest)} is a broken symlink.  "
+                   f"{RED}Skipping{NORMAL}.")
+            else:
+                raise(e)
+
     log(f"Moving {WHT}{_mark(src)}{NORMAL} to {dest_abbrev}")
     try:
-        shutil.move(src, dest)
-    except FileExistsError as e:
-        # ui(f"Uh. . . .  {e}, {dir(e)}")
-        # ui(f"Errno: {e.errno}, filename: {e.filename} args: {e.args}")
-        if os.path.islink(dest) and not os.path.exists(dest):
-            ui(f"Destination {_mark(dest)} is a symlink that points nowhere.  "
-               f"{RED}Skipping{NORMAL}.")
-        else:
-            raise(e)
+        trymove(src, dest)
     except PermissionError as e:
-        ui(f"{RED}Yo, Move Permission Error.{NORMAL}")
+        ui(f"{RED}Yo, Move Permission Error.{NORMAL}{e}")
         if unstick(src):
-            ui("It could possibly work to re-run.")
-        ui("Bye for now.")
-        sys.exit(1)
+            ui(f"File {src} seems better.  Retrying once.")
+            try:
+                trymove(src, dest)
+            except Exception as e:
+                ui(f"Nope.  {RED}{e}{NORMAL}")
+                ui("It could possibly still work to re-run.")
+                sys.exit(1)
+            return
     except Exception as e:
         ui(f"{RED}Ah HA!")
         raise(e)
@@ -443,7 +459,10 @@ def walk(src_dir, dest_dir, level):
                        f"{YEL}{dest_abbrev}{NORMAL} ({readable_date}).")
 
             # Check for directories we shouldn't open
-            dirtype = re.match(".*\\.git$|.*\\.xcodeproj$|.*\\.nib$", abs_f)
+            dirtype = re.match(".*\\.git$|.*\\.xcodeproj$|.*\\.nib$"
+                               "|.*\\.framework$|.*\\.app$", abs_f)
+            if dirtype:
+                ui(f"{RED}Dirtype {abs_f}{NORMAL}")
 
             # Report size
             if os.path.isfile(abs_f):
@@ -474,6 +493,7 @@ def walk(src_dir, dest_dir, level):
                         continue
                     if del_ok == 'n':
                         pass
+                continue
             if os.path.isdir(abs_f):
                 # Weird case: Source dir, dest file
                 if not os.path.isdir(dest_file):

@@ -5,6 +5,7 @@ import re
 import shutil
 import stat
 import sys
+from stat import S_IRUSR, S_IWUSR, S_IXUSR
 
 from datetime import datetime as dt
 from subprocess import run, STDOUT, PIPE, Popen, TimeoutExpired
@@ -141,34 +142,136 @@ def not_dead_gen():
         spinner_state = (spinner_state + 1) % len(spinner_map)
         yield
 
+def filestr(path, color=WHT):
+    """Canonical way to print a file"""
+    return f'{color}"{path}"{NORMAL}'
 
 def unstick(file):
-    """Make an attempt to make FILE readable and deleteable."""
+    """Make FILE readable and deleteable, or die trying."""
 
-    def my_run(cmd):
-        first = " ".join(cmd[:-1])
-        lastarg = cmd[-1]
-        ui(f"Running {WHT}{first} \"{lastarg}\"{NORMAL}")
-        result = run(cmd)
+    def my_run(cmd, path):
+        cmd_str = " ".join(cmd)
+        ui(f"Running {WHT}{cmd_str} {filestr(path)}")
+        result = run(cmd + [path])
         return result
 
-    def examine(file):
-        return my_run(["ls", "-dle@O", file])
+    def make_rw(path):
+        # Could alternately check with os.access() and os.R_OK, but if
+        # we need to set the file permissions, we need the stat bits
+        # anyway.
+        mode = os.stat(path, follow_symlinks=False).st_mode
+        RW = S_IRUSR | S_IWUSR
+        ok = mode & RW == RW
+        if not ok:
+            os.chmod(path, mode | RW, follow_symlinks=False)
+            new_mode = os.stat(path, follow_symlinks=False).st_mode
+            if not new_mode & RW == RW:
+                ui(f"{RED}chmod +rw failed: {filestr(path)}")
+                sys.exit(1)
 
-    ret = examine(file)
-    if ret.returncode == 0:
-        path_to_fix = file
-    if ret.returncode == 1:
-        # ls didn't even work.  Try to fix the parent dir.
-        path_to_fix = os.path.dirname(file)
-        ret = examine(dirname)
+    def make_rwx(path):
+        mode = os.stat(path, follow_symlinks=False).st_mode
+        RWX = S_IRUSR | S_IWUSR | S_IXUSR
+        ok = mode & RWX == RWX
+        if not ok:
+            os.chmod(path, mode | RWX, follow_symlinks=False)
+            new_mode = os.stat(path, follow_symlinks=False).st_mode
+            if not new_mode & RWX == RWX:
+                ui(f"{RED}chmod +rwx failed: {filestr(path)}")
+                sys.exit(1)
 
-    my_run(["chmod", "u+rwx", path_to_fix])
-    my_run(["chmod", "-RN", path_to_fix])
-    my_run(["chmod", "-h", "-a", "everyone deny write,delete,append,writeattr,writeextattr,chown", path_to_fix])
-    my_run(["xattr", "-rcs", path_to_fix])
-    # Maybe it worked?
-    return True
+    def make_readable(path):
+        """Make the permissions rw for files and rwx for dirs.  Non-recursive."""
+        if not os.path.isdir(path):
+            make_rw(path)
+            return True
+        else:
+            make_rwx(path)
+
+    def get_acls(path):
+        """Return a list containing ACLs for just this path (not ACLs of
+        directory contents).
+        """
+        result = run(["ls", "-aled", path], capture_output=True)
+        rs = result.stdout.decode()
+        acls = re.findall(r" \d+: .+", rs)
+        return acls
+
+    evil_acl = ' 0: group:everyone deny write,delete,append,writeattr,writeextattr,chown'
+    def remove_evil_acl(path):
+        no_evil_acl_cmd = ["chmod", "-h", "-a",
+                           "everyone deny write,delete,append,writeattr"
+                           ",writeextattr,chown", path]
+        run(no_evil_acl_cmd)
+
+
+    def remove_acls(path):
+        acls = get_acls(path)
+        if len(acls) > 0:
+            if len(acls) == 1 and acls[0] == evil_acl:
+                ui(f"{RED}Fixing evil ACL on {filestr(path)}{NORMAL}")
+                remove_evil_acl(path)
+                return
+            my_run(["chmod", "-N"], path)
+            acls = get_acls(path)
+            if len(acls) > 0:
+                ui(f"Still Evil ACL? {acls}")
+                # Maybe it's the evil ACL which has to be removed individually
+                remove_evil_acl(path)
+                ui(f"This shouldn't have happened.")
+                sys.exit(1)
+            ui(f"ACLs removed from {filestr(path)}.")
+
+    def get_xattrs(path):
+        result = run(["ls", "-al@d", path], capture_output=True)
+        rs = result.stdout.decode()
+        xattrs = re.findall(r"^  +.+  +\d+", rs)
+        if len(xattrs) > 0:
+            ui(f"{YEL}Xattrs: {xattrs}")
+        return xattrs
+
+
+    def remove_xattrs(path):
+        """Remove the xattrs on just this file/directory (not dir contents)."""
+        xa = get_xattrs(path)
+        if len(xa) > 0:
+            # "-c" means clear
+            # "-s" means operate on the symbolic link, not its target
+            my_run(["xattr", "-cs"], path)
+            new_xa = get_xattrs(path)
+            if len(new_xa) > 0:
+                ui(f"Remove xattrs failed: {filestr(path, color=RED)}")
+                ui(f" xattrs: {RED}{xa}{NORMAL}")
+                sys.exit(1)
+
+    def remove_uchg_schg(path):
+        """Take a whack at it."""
+        run(["chflags",  "-h",  "nouchg", path])
+        run(["chflags",  "-h",  "noschg", path])
+
+    def four_fixes(path):
+        # ui(f"    {WHT}{os.path.basename(path)}{NORMAL}")
+        make_readable(path)
+        remove_acls(path)
+        remove_xattrs(path)
+        remove_uchg_schg(path)
+
+    parent = os.path.dirname(file)
+    ui(f"Fixing parent ({filestr(parent)}).")
+    four_fixes(parent)
+
+    ui(f"Unstick({filestr(file)})")
+    four_fixes(file)
+
+    if os.path.isdir(file):
+        ui(f"Unsticking Contents of {filestr(file)}")
+        # Now do it all again for this whole tree
+        for root, dirs, files in os.walk(file):
+            not_dead_gen()
+            for dir in dirs:
+                four_fixes(os.path.normpath(os.path.join(root, dir)))
+            for file in files:
+                four_fixes(os.path.normpath(os.path.join(root, file)))
 
 
 def safe_len(path):
@@ -295,7 +398,6 @@ def printfiles(f1, f2, mod1, mod2):
 
 def remove(path):
     """Remove path, whether it's a file or a directory (and its contents)."""
-    ui(f"Here comes remove {path}.")
     deleter = os.remove
     mpath = _mark(path)
     if os.path.islink(path):
@@ -321,6 +423,18 @@ def remove(path):
                 ui(f"Deleted {path} after removing nouchg.")
             except PermissionError as fuu:
                 ui(f"Couldn't delete {mpath}: {e} and {fuu}")
+    if os.path.exists(path):
+        ui(f"{RED}Delete of {WHT}\"{path}\"{NORMAL} {RED}failed.{NORMAL}")
+        unstick(path)
+        try:
+            deleter(path)
+        except Exception as fuu:
+            ui(f"Even after all that, {WHT}\"{path}\"{NORMAL} isn't deleteable:"
+               f"{RED}{fuu}{NORMAL}")
+            sys.exit(1)
+    else:
+        pass
+        # ui(f"Deleted {WHT}{os.path.basename(path)}{NORMAL}.")
 
 
 def move(src, dest):
@@ -351,12 +465,11 @@ def move(src, dest):
                 ui(f"Nope.  {RED}{e}{NORMAL}")
                 ui("It could possibly still work to re-run.")
                 sys.exit(1)
+            ui(f"It {src} worked!")
             return
     except Exception as e:
-        ui(f"{RED}Ah HA!")
+        ui(f"{RED}An unusual error happened:  {e}")
         raise(e)
-
-
 
 
 def finderopen(path):
@@ -436,10 +549,17 @@ def walk(src_dir, dest_dir, level):
                 remove(abs_f)
                 continue
             else:
-                ui(f"Left {abs_f}.")
+                ui(f"Kept {abs_f}.")
         else:
             printfiles(abs_f, dest_abbrev, WHT, YEL)
             ui("  Differs.")
+
+            # Check for directories we shouldn't open
+            dirtype = re.match(".*\\.git$|.*\\.xcodeproj$|.*\\.nib$"
+                               "|.*\\.framework$|.*\\.app$|.*\\.bundle$", abs_f)
+            if dirtype:
+                ui(f"Treating {os.path.basename(abs_f)} as a unit")
+
 
             # Check mod times
             abs_f_mtime = os.path.getmtime(abs_f)
@@ -447,7 +567,7 @@ def walk(src_dir, dest_dir, level):
             ds = dt.fromtimestamp(dest_f_mtime)
             readable_date = ds.strftime("%Y-%m-%d %H:%M:%S")
             if abs_f_mtime == dest_f_mtime:
-                ui(f"Both have the same modification time ({abs_f_mtime}).")
+                ui(f"Both have the same modification time ({readable_date}).")
             else:
                 diff = abs(abs_f_mtime - dest_f_mtime)
                 amount = nicedelta(diff)
@@ -457,12 +577,6 @@ def walk(src_dir, dest_dir, level):
                     op = "older"
                     ui(f"{WHT}{_mark(abs_f)}{NORMAL} is {amount} {op} than "
                        f"{YEL}{dest_abbrev}{NORMAL} ({readable_date}).")
-
-            # Check for directories we shouldn't open
-            dirtype = re.match(".*\\.git$|.*\\.xcodeproj$|.*\\.nib$"
-                               "|.*\\.framework$|.*\\.app$", abs_f)
-            if dirtype:
-                ui(f"{RED}Dirtype {abs_f}{NORMAL}")
 
             # Report size
             if os.path.isfile(abs_f):

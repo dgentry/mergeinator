@@ -209,7 +209,7 @@ def unstick(file):
         acls = get_acls(path)
         if len(acls) > 0:
             if len(acls) == 1 and acls[0] == evil_acl:
-                ui(f"{RED}Fixing evil ACL on {filestr(path)}{NORMAL}")
+                log(f"{RED}Fixing evil ACL on {filestr(path)}{NORMAL}")
                 remove_evil_acl(path)
                 return
             my_run(["chmod", "-N"], path)
@@ -246,25 +246,23 @@ def unstick(file):
 
     def remove_uchg_schg(path):
         """Take a whack at it."""
-        run(["chflags",  "-h",  "nouchg", path])
-        run(["chflags",  "-h",  "noschg", path])
+        run(["chflags",  "-h",  "nouchg,noschg", path])
 
     def four_fixes(path):
         # ui(f"    {WHT}{os.path.basename(path)}{NORMAL}")
+        remove_uchg_schg(path)
         make_readable(path)
         remove_acls(path)
         remove_xattrs(path)
-        remove_uchg_schg(path)
 
     parent = os.path.dirname(file)
-    ui(f"Fixing parent ({filestr(parent)}).")
+    log(f"Fixing parent ({filestr(parent)}).")
     four_fixes(parent)
 
     ui(f"Unstick({filestr(file)})")
     four_fixes(file)
 
     if os.path.isdir(file):
-        ui(f"Unsticking Contents of {filestr(file)}")
         # Now do it all again for this whole tree
         for root, dirs, files in os.walk(file):
             not_dead_gen()
@@ -423,7 +421,8 @@ def remove(path):
                 ui(f"Deleted {path} after removing nouchg.")
             except PermissionError as fuu:
                 ui(f"Couldn't delete {mpath}: {e} and {fuu}")
-    if os.path.exists(path):
+    # os.path.exists reports false for broken symlinks
+    if os.path.exists(path) or os.path.islink(path):
         ui(f"{RED}Delete of {WHT}\"{path}\"{NORMAL} {RED}failed.{NORMAL}")
         unstick(path)
         try:

@@ -262,7 +262,7 @@ def unstick(file):
     ui(f"Unstick({filestr(file)})")
     four_fixes(file)
 
-    if os.path.isdir(file):
+    if os.path.isdir(file) and not os.path.islink(file):
         # Now do it all again for this whole tree
         for root, dirs, files in os.walk(file):
             not_dead_gen()
@@ -270,7 +270,7 @@ def unstick(file):
                 four_fixes(os.path.normpath(os.path.join(root, dir)))
             for file in files:
                 four_fixes(os.path.normpath(os.path.join(root, file)))
-
+    ui("Unstuck")
 
 def safe_len(path):
     if not os.path.isdir(path):
@@ -333,6 +333,7 @@ def identical(f1, f2):
                     chunk = bytearray(b'')
             except TimeoutExpired:
                 # Maybe need to read last chunk?
+                log("Timeout expired")
                 pass
             # Prints next spinner char
             next(not_dead)
@@ -555,13 +556,17 @@ def walk(src_dir, dest_dir, level):
 
             # Check for directories we shouldn't open
             dirtype = re.match(".*\\.git$|.*\\.xcodeproj$|.*\\.nib$"
-                               "|.*\\.framework$|.*\\.app$|.*\\.bundle$", abs_f)
+                               "|.*\\.framework$|.*\\.app$|.*\\.bundle$"
+                               "|.*\\.plugin$", abs_f)
             if dirtype:
                 ui(f"Treating {os.path.basename(abs_f)} as a unit")
 
-
             # Check mod times
-            abs_f_mtime = os.path.getmtime(abs_f)
+            try:
+                abs_f_mtime = os.path.getmtime(abs_f)
+            except PermissionError as e:
+                unstick(abs_f)
+                abs_f_mtime = os.path.getmtime(abs_f)
             dest_f_mtime = os.path.getmtime(dest_file)
             ds = dt.fromtimestamp(dest_f_mtime)
             readable_date = ds.strftime("%Y-%m-%d %H:%M:%S")

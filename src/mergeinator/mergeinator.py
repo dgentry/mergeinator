@@ -613,12 +613,12 @@ def walk(src_dir, dest_dir, level):
                         pass
                 continue
             if os.path.isdir(abs_f):
+                abs_f_entries = len(os.listdir(abs_f))
                 # Weird case: Source dir, dest file
                 if not os.path.isdir(dest_file):
                     ui(f"{WHT}{abs_f}{NORMAL} is a dir with {abs_f_entries} files, "
                        f"{dest_abbrev} is a plain file.  Not sure what to do.")
                     sys.exit();
-                abs_f_entries = len(os.listdir(abs_f))
                 dest_entries = len(os.listdir(dest_file))
                 ui(f"{WHT}{abs_f}{NORMAL} has {abs_f_entries} files, "
                    f"{dest_abbrev} has {dest_entries}.")

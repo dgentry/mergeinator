@@ -8,7 +8,7 @@ import sys
 from stat import S_IRUSR, S_IWUSR, S_IXUSR
 
 from datetime import datetime as dt
-from subprocess import run, STDOUT, PIPE, Popen, TimeoutExpired
+from subprocess import run, PIPE, Popen, TimeoutExpired
 
 from .logs import BLD, GRN, WHT, YEL, RED, NORMAL, DIM
 
@@ -218,7 +218,7 @@ def unstick(file):
                 ui(f"Still Evil ACL? {acls}")
                 # Maybe it's the evil ACL which has to be removed individually
                 remove_evil_acl(path)
-                ui(f"This shouldn't have happened.")
+                ui(f"This shouldn't have happened ({filestr(path)}).")
                 sys.exit(1)
             ui(f"ACLs removed from {filestr(path)}.")
 
@@ -279,9 +279,9 @@ def safe_len(path):
     try:
         listing = os.listdir(path)
     except PermissionError as e:
-        ui(f"Couldn't list {path} due to permission error.")
+        ui(f"Couldn't list {path} due to permission error {e}.")
         unstick(path)
-        ui(f"It might work to retry now.")
+        ui("It might work to retry the merge now.")
         sys.exit(1)
     return len(listing)
 
@@ -565,8 +565,10 @@ def walk(src_dir, dest_dir, level):
             try:
                 abs_f_mtime = os.path.getmtime(abs_f)
             except PermissionError as e:
+                ui(f"Error checking modification times ({e}).  Attempting fix.")
                 unstick(abs_f)
                 abs_f_mtime = os.path.getmtime(abs_f)
+            # TODO: Should probably catch similar problem at the destination.
             dest_f_mtime = os.path.getmtime(dest_file)
             ds = dt.fromtimestamp(dest_f_mtime)
             readable_date = ds.strftime("%Y-%m-%d %H:%M:%S")

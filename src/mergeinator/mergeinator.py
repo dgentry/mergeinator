@@ -456,7 +456,7 @@ def move(src, dest):
     try:
         trymove(src, dest)
     except PermissionError as e:
-        ui(f"{RED}Yo, Move Permission Error.{NORMAL}{e}")
+        ui(f"{YEL}Move Permission Error.{NORMAL}{e}")
         if unstick(src):
             ui(f"File {src} seems better.  Retrying once.")
             try:

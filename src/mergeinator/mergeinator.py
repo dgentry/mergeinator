@@ -105,13 +105,13 @@ GB = 1024 * MB
 
 
 def nice_size(bytes):
-    """Report bytes in appropriate units for size: T, G, M, K."""
-    if bytes > GB:
-        return f"{int(bytes*GB/10)/10} GB"
-    if bytes > MB:
-        return f"{int(bytes*MB/10)/10} MB"
-    if bytes > KB:
-        return f"{int(bytes*10/KB)/10} KB"
+    """Report bytes in appropriate units for size: T, G, M, K, with 2 decimals."""
+    if bytes >= GB:
+        return f"{round(bytes/GB, 2)} GB"
+    if bytes >= MB:
+        return f"{round(bytes/MB, 2)} MB"
+    if bytes >= KB:
+        return f"{round(bytes/KB, 2)} KB"
     return f"{bytes}B"
 
 

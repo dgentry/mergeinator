@@ -6,7 +6,7 @@ from os.path import splitext, basename
 setup(
     name='mergeinator',
     python_requires='>=3.6',
-    version='0.4',
+    version='0.5',
     license='GPL v2',
     description='The Mergeinator.',
     url='http://github.com/dgentry/mergeinator',
@@ -16,7 +16,7 @@ setup(
     package_dir={'': 'src'},
     py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
     include_package_data=True,
-    zip_safe=False,
+    zip_safe=True,
     classifiers=[
         # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
         'Development Status :: 3 - Alpha',

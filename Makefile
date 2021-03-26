@@ -69,7 +69,7 @@ profile: ## Runs the app and produces profiling data
 
 .PHONY: test
 test:	## Invoke pytest to run tests
-	py.test --pyargs mergeinator
+	py.test
 
 .PHONY: viewprofile
 viewprofile:

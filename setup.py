@@ -6,7 +6,7 @@ from os.path import splitext, basename
 setup(
     name='mergeinator',
     python_requires='>=3.6',
-    version='0.5.1',
+    version='0.6',
     license='GPL v2',
     description='The Mergeinator.',
     url='http://github.com/dgentry/mergeinator',

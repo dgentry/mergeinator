@@ -198,6 +198,7 @@ def unstick(file):
         return acls
 
     evil_acl = ' 0: group:everyone deny write,delete,append,writeattr,writeextattr,chown'
+    evil_acl2 = ' 0: group:everyone deny delete'
     def remove_evil_acl(path):
         no_evil_acl_cmd = ["chmod", "-h", "-a",
                            "everyone deny write,delete,append,writeattr"
@@ -208,7 +209,8 @@ def unstick(file):
     def remove_acls(path):
         acls = get_acls(path)
         if len(acls) > 0:
-            if len(acls) == 1 and acls[0] == evil_acl:
+            if len(acls) >= 1 and acls[0] == evil_acl \
+               or acls[0] == evil_acl2:
                 log(f"{RED}Fixing evil ACL on {filestr(path)}{NORMAL}")
                 remove_evil_acl(path)
                 return
@@ -255,6 +257,9 @@ def unstick(file):
         remove_acls(path)
         remove_xattrs(path)
 
+    #
+    # Start of unstick()
+    #
     parent = os.path.dirname(file)
     log(f"Fixing parent ({filestr(parent)}).")
     four_fixes(parent)
@@ -343,7 +348,11 @@ def identical(f1, f2):
         if ret == 2:
             ui(f"{DIM}{YEL}ret {ret}, output {sofar}{NORMAL}")
             ui(f"{RED}Diff returned an unexpected error.{NORMAL}.")
-            err_msg = bunk.decode()
+            try:
+                # Sometimes bunk hasn't been set.
+                err_msg = bunk.decode()
+            except UnboundLocalError:
+                err_msg = "Unknown"
             ui(f"  While running \"{' '.join(cmd)}\", error was:\n"
                f"  {YEL}{err_msg}{YEL}.\n")
             if not "Permission denied" in err_msg:
@@ -425,6 +434,7 @@ def remove(path):
     # os.path.exists reports false for broken symlinks
     if os.path.exists(path) or os.path.islink(path):
         ui(f"{RED}Delete of {WHT}\"{path}\"{NORMAL} {RED}failed.{NORMAL}")
+        #import pdb; pdb.set_trace()
         unstick(path)
         try:
             deleter(path)
@@ -467,6 +477,9 @@ def move(src, dest):
                 sys.exit(1)
             ui(f"It {src} worked!")
             return
+    except FileNotFoundError as e:
+        ui(f"{YEL}{src}{NORMAL} not found by trymove(), which is weird because os.walk() saw it.")
+        pass
     except Exception as e:
         ui(f"{RED}An unusual error happened:  {e}")
         raise(e)
@@ -516,9 +529,25 @@ def walk(src_dir, dest_dir, level):
     If it's identical, offer to delete it.
     If it differs, report the details and make an offer."""
 
+    def is_socket(path):
+        mode = os.stat(path).st_mode
+        return stat.S_ISSOCK(mode)
+
     for fname in os.listdir(src_dir):
         abs_f = os.path.normpath(os.path.join(src_dir, fname))
+        # Checking socketness of abs_f
+        try:
+            if is_socket(abs_f):
+                ui(f"{YEL}Skipping socket {filestr(abs_f)}.")
+                continue
+        except FileNotFoundError:
+            # This happens if the file is a symlink that points nowhere
+            # We handle it properly later.
+            ui(f"Not found file {abs_f} isn't a socket.  (Probably a dead symlink.)")
+
         dest_file = os.path.normpath(os.path.join(dest_dir, fname))
+        # Should possibly check socketness of dest_file too, but it hasn't come up.
+
         if not os.path.exists(dest_file):
             if os.path.islink(dest_file):
                 ui(f"{YEL}Destination {WHT}\"{dest_file}\"{YEL} is a symlink "
@@ -543,7 +572,7 @@ def walk(src_dir, dest_dir, level):
                 continue
         elif identical(abs_f, dest_file):
             printfiles(abs_f, dest_abbrev, WHT, "")
-            ui("  Identical.", end="")
+            ui("\nIdentical.", end="")
             merge = answer("  Delete? [Y/n]")
             if merge in ["", "y"]:
                 remove(abs_f)

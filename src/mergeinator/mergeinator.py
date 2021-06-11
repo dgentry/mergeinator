@@ -12,7 +12,6 @@ from subprocess import run, PIPE, Popen, TimeoutExpired
 
 from .logs import BLD, GRN, WHT, YEL, RED, NORMAL, DIM
 
-
 SECONDS_IN_MINUTE = 60
 SECONDS_IN_HOUR = 60 * SECONDS_IN_MINUTE
 SECONDS_IN_DAY = 24 * SECONDS_IN_HOUR
@@ -142,13 +141,14 @@ def not_dead_gen():
         spinner_state = (spinner_state + 1) % len(spinner_map)
         yield
 
+
 def filestr(path, color=WHT):
     """Canonical way to print a file"""
     return f'{color}"{path}"{NORMAL}'
 
+
 def unstick(file):
     """Make FILE readable and deleteable, or die trying."""
-
     def my_run(cmd, path):
         cmd_str = " ".join(cmd)
         ui(f"Running {WHT}{cmd_str} {filestr(path)}")
@@ -199,12 +199,13 @@ def unstick(file):
 
     evil_acl = ' 0: group:everyone deny write,delete,append,writeattr,writeextattr,chown'
     evil_acl2 = ' 0: group:everyone deny delete'
-    def remove_evil_acl(path):
-        no_evil_acl_cmd = ["chmod", "-h", "-a",
-                           "everyone deny write,delete,append,writeattr"
-                           ",writeextattr,chown", path]
-        run(no_evil_acl_cmd)
 
+    def remove_evil_acl(path):
+        no_evil_acl_cmd = [
+            "chmod", "-h", "-a", "everyone deny write,delete,append,writeattr"
+            ",writeextattr,chown", path
+        ]
+        run(no_evil_acl_cmd)
 
     def remove_acls(path):
         acls = get_acls(path)
@@ -232,7 +233,6 @@ def unstick(file):
             ui(f"{YEL}Xattrs: {xattrs}")
         return xattrs
 
-
     def remove_xattrs(path):
         """Remove the xattrs on just this file/directory (not dir contents)."""
         xa = get_xattrs(path)
@@ -247,8 +247,8 @@ def unstick(file):
                 sys.exit(1)
 
     def remove_uchg_schg(path):
-        """Take a whack at it."""
-        run(["chflags",  "-h",  "nouchg,noschg", path])
+        """Take a whack at removing these flags."""
+        run(["chflags", "-h", "nouchg,noschg", path])
 
     def four_fixes(path):
         # ui(f"    {WHT}{os.path.basename(path)}{NORMAL}")
@@ -277,6 +277,7 @@ def unstick(file):
                 four_fixes(os.path.normpath(os.path.join(root, file)))
     ui("Unstuck")
 
+
 def safe_len(path):
     if not os.path.isdir(path):
         ui(f"{path} isn't a directory.")
@@ -290,7 +291,8 @@ def safe_len(path):
         sys.exit(1)
     return len(listing)
 
-def identical(f1, f2):
+
+def is_identical(f1, f2):
     """Return true iff paths f1 and f2 have no diffs.
 
     Don't count permission differences.
@@ -307,13 +309,21 @@ def identical(f1, f2):
     # they aren't identical.
     if os.path.isdir(f1) and os.path.isdir(f2):
         if safe_len(f1) != safe_len(f2):
+            ui(f"{filestr(f1)} has {safe_len(f1)} items, {filestr(f2)} has {safe_len(f2)}.")
+            log(f"{YEL}{os.listdir(f1)}{NORMAL}\n{os.listdir(f2)}")
             return False
+
+    # Shortcut two: If two files are different lengths, they aren't identical.
+    if not os.path.isdir(f1) and not os.path.isdir(
+            f2) and os.path.getsize(f1) != os.path.getsize(f2):
+        ui(f"Size {os.path.getsize(f1)} != size {os.path.getsize(f2)}")
+        return False
 
     not_dead = not_dead_gen()
 
     ui(f"{DIM}Diff {WHT}{f1}...{NORMAL}")
-    # TODO: If diff doesn't support --no-dereference, print warning
-    # that it will fail on symlinks with no referent.
+    # TODO: If diff doesn't support --no-dereference, print warning that it
+    # will fail on symlinks with no referent.
     # GNU diff duplicates the last path element if it's a dir with no "/"
     if os.path.isdir(f1):
         f1 = f1 + "/"
@@ -325,7 +335,10 @@ def identical(f1, f2):
     chunk = bytearray(b'')
     import io
     # ui(f"io.DEF {io.DEFAULT_BUFFER_SIZE}.")
-    with Popen(cmd, stdout=PIPE, stderr=PIPE, bufsize=100 * io.DEFAULT_BUFFER_SIZE) as p:
+    with Popen(cmd,
+               stdout=PIPE,
+               stderr=PIPE,
+               bufsize=100 * io.DEFAULT_BUFFER_SIZE) as p:
         ret = None
         # ui("Popened.")
         while ret is None:
@@ -378,7 +391,7 @@ def _dmark(path):
     elif os.path.isfile(path) and os.access(path, os.X_OK):
         return "*"
     elif os.path.islink(path):
-        return"@"
+        return "@"
     elif stat.S_ISSOCK(os.stat(path).st_mode):
         return "="
     elif stat.S_ISWHT(os.stat(path).st_mode):
@@ -401,7 +414,19 @@ def printfiles(f1, f2, mod1, mod2):
         f1, f2: filenames to print.
         mod1, mod2: color/bold/dim modifier
     """
-    ui(f"{mod1}{f1}{_dmark(f1)}{NORMAL} ?--> {mod2}{f2}{_dmark(f2)}{NORMAL}", end="")
+    ui(f"{mod1}{f1}{_dmark(f1)}{NORMAL} ?--> {mod2}{f2}{_dmark(f2)}{NORMAL}",
+       end="")
+
+
+def mac_tree_deleter(path):
+    if os.path.isdir(path):
+        # a = answer(f"{YEL}Deleting dir {filestr(path)}. OK? [Y/n]")
+        # if a == "y":
+        run(["rm", "-rf", path])
+        # else:
+        #    ui("Didn't delete.")
+    else:
+        run(["rm", path])
 
 
 def remove(path):
@@ -414,13 +439,20 @@ def remove(path):
         log(f"Deleting file {mpath}")
     elif os.path.isdir(path):
         log(f"Deleting dir {mpath}")
-        deleter = shutil.rmtree
+        # As of python 3.9.5 (and before), shutil.py explicitly punts
+        # on MacOS metadata, so the deleter fails on fairly simple
+        # MacOS trees stored on NFS.
+        # TODO: Choose deleter based on OS
+        # deleter = shutil.rmtree
+        deleter = mac_tree_deleter
     else:
         ui(f"Don't know how to delete {mpath}!")
         sys.exit(1)
     try:
+        # Two known ways this can fail.
         deleter(path)
     except PermissionError as e:
+        # 1. Permission Error
         if e.args[1] == "Operation not permitted":
             # Empirically, this has been due to MacOS uchg.
             # It could also be locked with xattrs.
@@ -431,6 +463,11 @@ def remove(path):
                 ui(f"Deleted {path} after removing nouchg.")
             except PermissionError as fuu:
                 ui(f"Couldn't delete {mpath}: {e} and {fuu}")
+    except FileNotFoundError as e:
+        # 2. Metadata file gets deleted during the operation, confusing rmtree()
+        ui(f"Glitch deleting {filestr(path)}: {e}")
+        #import pdb; pdb.set_trace()
+
     # os.path.exists reports false for broken symlinks
     if os.path.exists(path) or os.path.islink(path):
         ui(f"{RED}Delete of {WHT}\"{path}\"{NORMAL} {RED}failed.{NORMAL}")
@@ -460,9 +497,9 @@ def move(src, dest):
                 ui(f"Destination {_mark(dest)} is a broken symlink.  "
                    f"{RED}Skipping{NORMAL}.")
             else:
-                raise(e)
+                raise (e)
 
-    log(f"Moving {WHT}{_mark(src)}{NORMAL} to {dest_abbrev}")
+    log(f"Moving {WHT}{_mark(src)}{NORMAL} to {dest}")
     try:
         trymove(src, dest)
     except PermissionError as e:
@@ -482,7 +519,7 @@ def move(src, dest):
         pass
     except Exception as e:
         ui(f"{RED}An unusual error happened:  {e}")
-        raise(e)
+        raise (e)
 
 
 def finderopen(path):
@@ -528,7 +565,6 @@ def walk(src_dir, dest_dir, level):
     If it's empty or a symlink, offer to delete it.
     If it's identical, offer to delete it.
     If it differs, report the details and make an offer."""
-
     def is_socket(path):
         mode = os.stat(path).st_mode
         return stat.S_ISSOCK(mode)
@@ -542,8 +578,14 @@ def walk(src_dir, dest_dir, level):
                 continue
         except FileNotFoundError:
             # This happens if the file is a symlink that points nowhere
-            # We handle it properly later.
-            ui(f"Not found file {abs_f} isn't a socket.  (Probably a dead symlink.)")
+            ui(f"Not found file {abs_f} isn't a socket.")
+            basename = os.path.basename(abs_f)
+            if basename[0:1] == "._":
+                ui(f"{basename} was metadata file that went away with primary?"
+                   )
+            else:
+                ui(f"{YEL}{basename} Dead symlink?{NORMAL}")
+            continue
 
         dest_file = os.path.normpath(os.path.join(dest_dir, fname))
         # Should possibly check socketness of dest_file too, but it hasn't come up.
@@ -570,7 +612,7 @@ def walk(src_dir, dest_dir, level):
             if del_ok in ["", "y", "d"]:
                 remove(abs_f)
                 continue
-        elif identical(abs_f, dest_file):
+        elif is_identical(abs_f, dest_file):
             printfiles(abs_f, dest_abbrev, WHT, "")
             ui("\nIdentical.", end="")
             merge = answer("  Delete? [Y/n]")
@@ -584,9 +626,10 @@ def walk(src_dir, dest_dir, level):
             ui("  Differs.")
 
             # Check for directories we shouldn't open
-            dirtype = re.match(".*\\.git$|.*\\.xcodeproj$|.*\\.nib$"
-                               "|.*\\.framework$|.*\\.app$|.*\\.bundle$"
-                               "|.*\\.plugin$", abs_f)
+            dirtype = re.match(
+                ".*\\.git$|.*\\.xcodeproj$|.*\\.nib$"
+                "|.*\\.framework$|.*\\.app$|.*\\.bundle$"
+                "|.*\\.plugin$", abs_f)
             if dirtype:
                 ui(f"Treating {os.path.basename(abs_f)} as a unit")
 
@@ -594,7 +637,8 @@ def walk(src_dir, dest_dir, level):
             try:
                 abs_f_mtime = os.path.getmtime(abs_f)
             except PermissionError as e:
-                ui(f"Error checking modification times ({e}).  Attempting fix.")
+                ui(f"Error checking modification times ({e}).  Attempting fix."
+                   )
                 unstick(abs_f)
                 abs_f_mtime = os.path.getmtime(abs_f)
             # TODO: Should probably catch similar problem at the destination.
@@ -631,11 +675,13 @@ def walk(src_dir, dest_dir, level):
                     older_file = abs_f
                 del_ok = "d"
                 while del_ok == 'd':
-                    del_ok = answer(f"[R]emove older file ({older_file + _dmark(older_file)}) "
-                                    "or show [d]iff [R/n/d]?")
+                    del_ok = answer(
+                        f"[R]emove older file ({older_file + _dmark(older_file)}) "
+                        "or show [d]iff [R/n/d]?")
                     if del_ok == 'd':
                         ui("\n{BOLD}Showing Diff{NORMAL}")
-                        rv = run(["diff", "-r", abs_f, dest_file], capture_output=True)
+                        rv = run(["diff", "-r", abs_f, dest_file],
+                                 capture_output=True)
                         ui(rv.stdout)
                     if del_ok in ['', 'r', 'y']:
                         remove(older_file)
@@ -649,14 +695,15 @@ def walk(src_dir, dest_dir, level):
                 if not os.path.isdir(dest_file):
                     ui(f"{WHT}{abs_f}{NORMAL} is a dir with {abs_f_entries} files, "
                        f"{dest_abbrev} is a plain file.  Not sure what to do.")
-                    sys.exit();
+                    sys.exit()
                 dest_entries = len(os.listdir(dest_file))
                 ui(f"{WHT}{abs_f}{NORMAL} has {abs_f_entries} files, "
                    f"{dest_abbrev} has {dest_entries}.")
 
                 # Ask for help
                 if os.path.isdir(abs_f):
-                    action = answer("[C]heck inside, [o]pen in finder, or [s]kip [Cos]?")
+                    action = answer(
+                        "[C]heck inside, [o]pen in finder, or [s]kip [Cos]?")
                     if action in ["y", "c", ""]:
                         walk(abs_f, dest_file, level + 1)
                     elif action == "o":
@@ -664,3 +711,21 @@ def walk(src_dir, dest_dir, level):
                         finderopen(dest_file)
                     elif action == "s":
                         ui("Skipping.")
+
+
+def move_maybe(src, dst, yes_flag=False, dry_run_flag=False):
+    """If src and dst both exist and have the same content, delete src.
+    If they differ, offer to move src to dst's enclosing directory (if
+    it exists) with a unique name."""
+    ui(f"Maybe moving {src} to {dst}")
+    assert os.path.isfile(src)
+    if not os.path.exists(dst):
+        move(src, dst)
+    elif os.path.isfile(dst):
+        if is_identical(src, dst):
+            ui(f"{filestr(src)} and {filestr(dst)} are identical.  Deleting {filestr(src)}."
+               )
+            remove(src)
+    else:
+        ui(f"{filestr(src)} and {filestr(dst)} differ or something.  Ignoring for the moment."
+           )

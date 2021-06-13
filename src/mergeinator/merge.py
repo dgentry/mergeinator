@@ -3,12 +3,14 @@
 
 from click import command, argument, option, version_option, echo, Path
 import pkg_resources  # For version number
-from os.path import abspath, isfile, isdir, sep, basename
-from mergeinator import WHT, NORMAL, DIM, do_merge, move_maybe
+from os.path import abspath, exists, isfile, isdir, basename
+from sys import exit
+
+from mergeinator import WHT, NORMAL, do_merge, move_maybe
 
 
 @command()
-@argument("source", type=Path(exists=True))
+@argument("source", type=Path())
 @argument("destination", type=Path())
 @option("-n", "--dryrun", help="Don't change anything", is_flag=True)
 @option("-y", "--yes", help="force answer of yes to questions.", is_flag=True)
@@ -39,6 +41,9 @@ def cli(source, destination, dryrun, yes):
     """
     my_version = pkg_resources.require("mergeinator")[0].version
     echo(f"Mergeinator {my_version}")
+    if not exists(source):
+        echo(f"{WHT}{source}{NORMAL} doesn't exist.  My work here is done.")
+        exit(0)
     echo(f"Merging {WHT}{source}{NORMAL} to {WHT}{destination}{NORMAL}\n")
     echo(f"Full paths: {abspath(source)} to {abspath(destination)}\n")
     if isfile(source) and isfile(destination):

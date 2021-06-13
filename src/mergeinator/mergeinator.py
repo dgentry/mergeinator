@@ -569,6 +569,14 @@ def walk(src_dir, dest_dir, level):
         mode = os.stat(path).st_mode
         return stat.S_ISSOCK(mode)
 
+    fnames = os.listdir(src_dir)
+    if len(fnames) == 0:
+        ui("Source directory is empty.  ", end='')
+        delete_it = answer("Delete it?  [N/y]")
+        if delete_it:
+            remove(src_dir)
+        return
+
     for fname in os.listdir(src_dir):
         abs_f = os.path.normpath(os.path.join(src_dir, fname))
         # Checking socketness of abs_f
@@ -727,5 +735,4 @@ def move_maybe(src, dst, yes_flag=False, dry_run_flag=False):
                )
             remove(src)
     else:
-        ui(f"{filestr(src)} and {filestr(dst)} differ or something.  Ignoring for the moment."
-           )
+        ui(f"{filestr(src)} and {filestr(dst)} differ or something.  Ignoring for now.")

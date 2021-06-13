@@ -446,6 +446,7 @@ def remove(path):
         # deleter = shutil.rmtree
         deleter = mac_tree_deleter
     else:
+        import pdb; pdb.set_trace()
         ui(f"Don't know how to delete {mpath}!")
         sys.exit(1)
     try:
@@ -592,7 +593,10 @@ def walk(src_dir, dest_dir, level):
                 ui(f"{basename} was metadata file that went away with primary?"
                    )
             else:
-                ui(f"{YEL}{basename} Dead symlink?{NORMAL}")
+                ui(f"{YEL}{basename} is a dead symlink.{NORMAL}  ", end='')
+                delete_it = answer("Delete it? [N/y]")
+                if delete_it == "y":
+                    remove(abs_f)
             continue
 
         dest_file = os.path.normpath(os.path.join(dest_dir, fname))

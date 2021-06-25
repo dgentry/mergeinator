@@ -20,6 +20,13 @@ SECONDS_IN_WEEK = 7 * SECONDS_IN_DAY
 SECONDS_IN_MONTH = 30 * SECONDS_IN_DAY
 SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY
 
+DIFF_PATH = "/usr/bin/diff"
+ALT_DIFF_PATH = "/usr/local/bin/diff"
+
+
+if os.path.isfile(ALT_DIFF_PATH):
+    DIFF_PATH = ALT_DIFF_PATH
+
 
 def log(*args, **kwargs):
     mode = "w+"
@@ -329,7 +336,7 @@ def is_identical(f1, f2):
         f1 = f1 + "/"
     if os.path.isdir(f2):
         f2 = f2 + "/"
-    cmd = ["/usr/local/bin/diff", "-r", "--no-dereference", "-q", f1, f2]
+    cmd = [DIFF_PATH, "-r", "--no-dereference", "-q", f1, f2]
     log(f"{DIM}{WHT}Diff cmd: {cmd}...{NORMAL}")
     sofar = bytearray(b'')
     chunk = bytearray(b'')
@@ -368,7 +375,7 @@ def is_identical(f1, f2):
                 err_msg = "Unknown"
             ui(f"  While running \"{' '.join(cmd)}\", error was:\n"
                f"  {YEL}{err_msg}{YEL}.\n")
-            if not "Permission denied" in err_msg:
+            if "Permission denied" not in err_msg:
                 sys.exit(1)
             ui("Continuing after permission error.")
         # If there is a difference (or an error), ret will be nonzero
@@ -446,7 +453,8 @@ def remove(path):
         # deleter = shutil.rmtree
         deleter = mac_tree_deleter
     else:
-        import pdb; pdb.set_trace()
+        import pdb
+        pdb.set_trace()
         ui(f"Don't know how to delete {mpath}!")
         sys.exit(1)
     try:
@@ -467,12 +475,12 @@ def remove(path):
     except FileNotFoundError as e:
         # 2. Metadata file gets deleted during the operation, confusing rmtree()
         ui(f"Glitch deleting {filestr(path)}: {e}")
-        #import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
 
     # os.path.exists reports false for broken symlinks
     if os.path.exists(path) or os.path.islink(path):
         ui(f"{RED}Delete of {WHT}\"{path}\"{NORMAL} {RED}failed.{NORMAL}")
-        #import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         unstick(path)
         try:
             deleter(path)
@@ -515,7 +523,7 @@ def move(src, dest):
                 sys.exit(1)
             ui(f"It {src} worked!")
             return
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         ui(f"{YEL}{src}{NORMAL} not found by trymove(), which is weird because os.walk() saw it.")
         pass
     except Exception as e:

@@ -1,0 +1,4 @@
+* In the ASCII UI the file on left is always white, the file on the right is always yellow.
+
+* Merge behaves a little more like a smart mv.
+  ** If the destination file is the same as the src file, just delete the src file.

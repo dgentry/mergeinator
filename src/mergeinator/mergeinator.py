@@ -74,20 +74,40 @@ def nicedelta(delta_s):
         return "infinitesimal "
 
     str = ""
+    sig_fig = 0
     if years > 0:
+        sig_fig = 1
         str = f"{years}Y "
     if months > 0:
+        sig_fig += 1
         str += f"{months}M "
+    if sig_fig >= 2:
+        return str
     if weeks > 0:
+        sig_fig += 1
         str += f"{weeks}W "
+    if sig_fig >= 2:
+        return str
     if days > 0:
+        sig_fig += 1
         str += f"{days}d "
+    if sig_fig >= 2:
+        return str
     if hours > 0:
+        sig_fig += 1
         str += f"{hours}h "
+    if sig_fig >= 2:
+        return str
     if minutes > 0:
+        sig_fig += 1
         str += f"{minutes}m "
+    if sig_fig >= 2:
+        return str
     if seconds > 0:
+        sig_fig += 1
         str += f"{seconds}s "
+    if sig_fig >= 2:
+        return str
     if not len(str) > 0:
         if milliseconds > 0:
             str += f"{milliseconds}ms "
@@ -230,7 +250,6 @@ def unstick(file):
             ui(f"{YEL}Xattrs: {xattrs}")
         return xattrs
 
-
     def remove_xattrs(path):
         """Remove the xattrs on just this file/directory (not dir contents)."""
         xa = get_xattrs(path)
@@ -325,7 +344,7 @@ def identical(f1, f2):
         # ui("Popened.")
         while ret is None:
             try:
-                (chunk, bunk) = p.communicate(timeout=0.1)
+                (chunk, bunk) = p.communicate(timeout=0.25)
                 # ui("Chunk: ", chunk, ".")
                 # ui("Bunk: ", bunk, ".")
                 if len(chunk) > 0:
@@ -333,7 +352,7 @@ def identical(f1, f2):
                     chunk = bytearray(b'')
             except TimeoutExpired:
                 # Maybe need to read last chunk?
-                log("Timeout expired")
+                log("waiting on diff")
                 pass
             # Prints next spinner char
             next(not_dead)
@@ -504,7 +523,10 @@ def do_merge(src, dest, level, dry_run_flag, yes_flag):
     force_yes = yes_flag
     dry_run = dry_run_flag
     dest_dir = dest
-    dest_abbrev = dest_dir + "/. . ."
+    if dest_dir[-1] != "/":
+        dest_abbrev = dest_dir + "/. . ."
+    else:
+        dest_abbrev = dest_dir + ". . ."
     walk(src, dest_dir, level)
 
 

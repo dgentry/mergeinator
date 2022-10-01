@@ -20,19 +20,20 @@ SECONDS_IN_WEEK = 7 * SECONDS_IN_DAY
 SECONDS_IN_MONTH = 30 * SECONDS_IN_DAY
 SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY
 
+# Filenames
+MERGE_LOG="merge.log"
+
+# Prefer /usr/local/bin/diff because it's probably GNU diff.  Lame heuristic, I know.
 DIFF_PATH = "/usr/bin/diff"
 ALT_DIFF_PATH = "/usr/local/bin/diff"
-
-
 if os.path.isfile(ALT_DIFF_PATH):
     DIFF_PATH = ALT_DIFF_PATH
 
-
 def log(*args, **kwargs):
     mode = "w+"
-    if os.path.isfile("merge.log"):
+    if os.path.isfile(MERGE_LOG):
         mode = "a"
-    with open("merge.log", mode) as global_log:
+    with open(MERGE_LOG, mode) as global_log:
         print(dt.isoformat(dt.now()), *args, file=global_log, **kwargs)
 
 
@@ -580,6 +581,8 @@ def do_merge(src, dest, level, dry_run_flag, yes_flag):
     global dry_run
     global dest_dir
     global dest_abbrev
+    global diff_executable
+
     force_yes = yes_flag
     dry_run = dry_run_flag
     dest_dir = dest
@@ -723,8 +726,7 @@ def walk(src_dir, dest_dir, level):
                         "or show [d]iff [R/n/d]?")
                     if del_ok == 'd':
                         ui("\n{BOLD}Showing Diff{NORMAL}")
-                        rv = run(["diff", "-r", abs_f, dest_file],
-                                 capture_output=True)
+                        rv = run([DIFF_PATH, "-r", abs_f, dest_file], capture_output=True)
                         ui(rv.stdout)
                     if del_ok in ['', 'r', 'y']:
                         remove(older_file)

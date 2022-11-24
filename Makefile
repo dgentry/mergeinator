@@ -29,12 +29,18 @@ endif
 help: ## Show this help.
 	@fgrep -h "##" Makefile | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##//'
 
+.PHONY: prereq-packages
+prereq-packages:
+	python3 -m pip install -r requirements.txt
+
 .PHONY: install
 install:  ## Install to your system or virtualenv.
+install: prereq-packages
 	python3 -m pip install .
 
 .PHONY: develop
 develop:  ## Install to your system or virtualenv, using a symlink so edits take immediate effect.
+develop: prereq-packages
 	python3 -m pip install -e .
 
 .PHONY: uninstall
@@ -69,7 +75,7 @@ profile: ## Runs the app and produces profiling data
 
 .PHONY: test
 test:	## Invoke pytest to run tests
-	py.test --pyargs mergeinator
+	py.test
 
 .PHONY: viewprofile
 viewprofile:

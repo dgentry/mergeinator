@@ -1,2 +1,4 @@
-Click==7.0
-colored==1.3.93
+Click>=7.0
+colored>=1.3.93
+pytest
+wheel

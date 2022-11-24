@@ -13,6 +13,13 @@ from subprocess import run, PIPE, Popen, TimeoutExpired
 from .logs import BLD, GRN, WHT, YEL, RED, NORMAL, DIM, log, ui
 from .nicer import nice_delta, nice_size
 
+DIFF_PATH = ['/usr/local/bin/diff', '/opt/homebrew/bin/diff', '/usr/bin/diff']
+for p in DIFF_PATH:
+    if os.access(p, os.X_OK):
+        DIFF = p
+        break
+
+
 def answer(question):
     global force_yes
     global dry_run
@@ -48,6 +55,7 @@ def filestr(path, color=WHT):
 
 def unstick(file):
     """Make FILE readable and deleteable, or die trying."""
+
     def my_run(cmd, path):
         cmd_str = " ".join(cmd)
         ui(f"Running {WHT}{cmd_str} {filestr(path)}")
@@ -228,16 +236,13 @@ def is_identical(f1, f2):
         f1 = f1 + "/"
     if os.path.isdir(f2):
         f2 = f2 + "/"
-    cmd = [DIFF_PATH, "-r", "--no-dereference", "-q", f1, f2]
+    cmd = [DIFF, "-r", "--no-dereference", "-q", f1, f2]
     log(f"{DIM}{WHT}Diff cmd: {cmd}...{NORMAL}")
     sofar = bytearray(b'')
     chunk = bytearray(b'')
     import io
     # ui(f"io.DEF {io.DEFAULT_BUFFER_SIZE}.")
-    with Popen(cmd,
-               stdout=PIPE,
-               stderr=PIPE,
-               bufsize=100 * io.DEFAULT_BUFFER_SIZE) as p:
+    with Popen(cmd, stdout=PIPE, stderr=PIPE, bufsize=100 * io.DEFAULT_BUFFER_SIZE) as p:
         ret = None
         # ui("Popened.")
         while ret is None:
@@ -313,8 +318,7 @@ def printfiles(f1, f2, mod1, mod2):
         f1, f2: filenames to print.
         mod1, mod2: color/bold/dim modifier
     """
-    ui(f"{mod1}{f1}{_dmark(f1)}{NORMAL} ?--> {mod2}{f2}{_dmark(f2)}{NORMAL}",
-       end="")
+    ui(f"{mod1}{f1}{_dmark(f1)}{NORMAL} ?--> {mod2}{f2}{_dmark(f2)}{NORMAL}", end="")
 
 
 def mac_tree_deleter(path):
@@ -471,6 +475,7 @@ def walk(src_dir, dest_dir, level):
     If it's empty or a symlink, offer to delete it.
     If it's identical, offer to delete it.
     If it differs, report the details and make an offer."""
+
     def is_socket(path):
         mode = os.stat(path).st_mode
         return stat.S_ISSOCK(mode)
@@ -495,8 +500,7 @@ def walk(src_dir, dest_dir, level):
             ui(f"Not found file {abs_f} isn't a socket.")
             basename = os.path.basename(abs_f)
             if basename[0:1] == "._":
-                ui(f"{basename} was metadata file that went away with primary?"
-                   )
+                ui(f"{basename} was metadata file that went away with primary?")
             else:
                 ui(f"{YEL}{basename} is a dead symlink.{NORMAL}  ", end='')
                 delete_it = answer("Delete it? [N/y]")
@@ -554,8 +558,7 @@ def walk(src_dir, dest_dir, level):
             try:
                 abs_f_mtime = os.path.getmtime(abs_f)
             except PermissionError as e:
-                ui(f"Error checking modification times ({e}).  Attempting fix."
-                   )
+                ui(f"Error checking modification times ({e}).  Attempting fix.")
                 unstick(abs_f)
                 abs_f_mtime = os.path.getmtime(abs_f)
             # TODO: Should probably catch similar problem at the destination.
@@ -592,12 +595,11 @@ def walk(src_dir, dest_dir, level):
                     older_file = abs_f
                 del_ok = "d"
                 while del_ok == 'd':
-                    del_ok = answer(
-                        f"[R]emove older file ({older_file + _dmark(older_file)}) "
-                        "or show [d]iff [R/n/d]?")
+                    del_ok = answer(f"[R]emove older file ({older_file + _dmark(older_file)}) "
+                                    "or show [d]iff [R/n/d]?")
                     if del_ok == 'd':
                         ui("\n{BOLD}Showing Diff{NORMAL}")
-                        rv = run([DIFF_PATH, "-r", abs_f, dest_file], capture_output=True)
+                        rv = run([DIFF, "-r", abs_f, dest_file], capture_output=True)
                         ui(rv.stdout)
                     if del_ok in ['', 'r', 'y']:
                         remove(older_file)
@@ -618,8 +620,7 @@ def walk(src_dir, dest_dir, level):
 
                 # Ask for help
                 if os.path.isdir(abs_f):
-                    action = answer(
-                        "[C]heck inside, [o]pen in finder, or [s]kip [Cos]?")
+                    action = answer("[C]heck inside, [o]pen in finder, or [s]kip [Cos]?")
                     if action in ["y", "c", ""]:
                         walk(abs_f, dest_file, level + 1)
                     elif action == "o":
@@ -639,8 +640,7 @@ def move_maybe(src, dst, yes_flag=False, dry_run_flag=False):
         move(src, dst)
     elif os.path.isfile(dst):
         if is_identical(src, dst):
-            ui(f"{filestr(src)} and {filestr(dst)} are identical.  Deleting {filestr(src)}."
-               )
+            ui(f"{filestr(src)} and {filestr(dst)} are identical.  Deleting {filestr(src)}.")
             remove(src)
     else:
         ui(f"{filestr(src)} and {filestr(dst)} differ or something.  Ignoring for now.")

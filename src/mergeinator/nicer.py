@@ -1,4 +1,13 @@
 
+SECONDS_IN_MINUTE = 60
+SECONDS_IN_HOUR = 60 * SECONDS_IN_MINUTE
+SECONDS_IN_DAY = 24 * SECONDS_IN_HOUR
+SECONDS_IN_WEEK = 7 * SECONDS_IN_DAY
+# These are approximate:
+SECONDS_IN_MONTH = 30 * SECONDS_IN_DAY
+SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY
+
+
 def nice_delta(delta_s):
     """Return an approximate nice looking time delta string from delta (in seconds).
 
@@ -77,4 +86,3 @@ def nice_size(bytes):
     if bytes > KB:
         return f"{int(bytes*10/KB)/10} KB"
     return f"{bytes}B"
-

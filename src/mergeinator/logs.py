@@ -9,10 +9,10 @@ if stdout.isatty() or ('TERM' in environ and 'color' in environ['TERM']):
     GRN = fg('green')
     YEL = fg('yellow')
     RED = fg('red')
-    BLD = style.BOLD
-    NORMAL = style.RESET
+    BLD = style(name="BOLD")
+    NORMAL = style(name="RESET")
     RESET = "\x1b[39m"
-    DIM = style.DIM
+    DIM = style(name="DIM")
 # But don't pollute a logfile with escape sequences
 else:
     WHT = ''
